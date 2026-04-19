@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he-IL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מקצר הקישורים של ראם</title>
+    
+    <link rel="stylesheet" href="./קיצור לינק מאובטח, ידידותי ובחינם _ דידלי Did.Li_files/frontend.min.css">
+    <link rel="stylesheet" href="./קיצור לינק מאובטח, ידידותי ובחינם _ דידלי Did.Li_files/post-7.css">
+    
+    <style>
+        .admin-panel {
+            max-width: 500px;
+            margin: 100px auto;
+            padding: 30px;
+            background: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        .slug-container {
+            display: flex;
+            align-items: center;
+            direction: ltr;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding-left: 10px;
+        }
+        .slug-container span { color: #666; font-size: 14px; }
+        .slug-container input { border: none; background: transparent; }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        #status { margin-top: 15px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="admin-panel">
+    <h2>שלום ראם, צור קישור חדש</h2>
+    
+    <input type="url" id="longUrl" placeholder="הדבק כאן את הקישור הארוך (https://...)">
+    
+    <div class="slug-container">
+        <span>rb077858.github.io/b/?id=</span>
+        <input type="text" id="slug" placeholder="סיומת">
+    </div>
+
+    <button id="btnShorten">צור קישור מקוצר</button>
+    <div id="status"></div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  // החלף את הפרטים הבאים ב-Config האמיתי שלך מ-Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyC_I0SPhZfC3qOfsJ6ZhURN_3QEwmYGU6Y",
+  authDomain: "reem-shortener.firebaseapp.com",
+  projectId: "reem-shortener",
+  storageBucket: "reem-shortener.firebasestorage.app",
+  messagingSenderId: "1098344042999",
+  appId: "1:1098344042999:web:c823e438cd424802195ef2"
+};
+
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  document.getElementById('btnShorten').onclick = async () => {
+    const url = document.getElementById('longUrl').value;
+    const slug = document.getElementById('slug').value;
+    const status = document.getElementById('status');
+
+    if (!url || !slug) {
+        status.style.color = "red";
+        status.innerText = "חובה למלא את כל השדות";
+        return;
+    }
+
+    try {
+        await setDoc(doc(db, "links", slug), {
+            originalUrl: url,
+            createdAt: new Date()
+        });
+        status.style.color = "green";
+        status.innerHTML = `הקישור נוצר! <br> <a href="https://rb077858.github.io/b/?id=${slug}" target="_blank">לחץ כאן לבדיקה</a>`;
+    } catch (e) {
+        status.style.color = "red";
+        status.innerText = "שגיאה בשמירה: " + e.message;
+    }
+  };
+</script>
+
+</body>
+</html>
