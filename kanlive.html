@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>שידור חי - כאן</title>
+  <style>
+    :root {
+      --bg: #0f1724;
+      --card: #1b2638;
+      --text: #f2f5fa;
+      --muted: #9aa8bd;
+      --accent: #3fa9f5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+      padding: 16px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 40px 32px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+    h1 { margin: 0 0 12px; font-size: 2rem; }
+    p { margin: 0; color: var(--muted); font-size: 1rem; }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      margin: 0 auto 16px;
+      border: 4px solid rgba(255, 255, 255, 0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="spinner" class="spinner"></div>
+    <h1 id="title">בודק את השעה...</h1>
+    <p id="subtitle"></p>
+  </div>
+
+  <script>
+    // חלון השידור לפי שעון ישראל (27/09/2026 - שעון קיץ, UTC+3)
+    const START = Date.parse("2026-09-27T21:30:00+03:00");
+    const END = Date.parse("2026-09-27T22:00:00+03:00");
+    const LIVE_URL = "https://www.kan.org.il/live/";
+    const REDIRECT_DELAY_MS = 3000;
+
+    const titleEl = document.getElementById("title");
+    const subtitleEl = document.getElementById("subtitle");
+    const spinnerEl = document.getElementById("spinner");
+
+    async function fetchWithTimeout(url, options = {}, ms = 5000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ms);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal, cache: "no-store" });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    // מחזיר את הזמן הנוכחי (במילישניות) לפי שרת זמן חיצוני
+    async function getServerTime() {
+      const sources = [
+        async () => {
+          const res = await fetchWithTimeout("https://worldtimeapi.org/api/timezone/Asia/Jerusalem");
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          return data.unixtime * 1000;
+        },
+        async () => {
+          const res = await fetchWithTimeout("https://timeapi.io/api/time/current/zone?timeZone=Asia%2FJerusalem");
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          // dateTime מוחזר כשעה מקומית בישראל ללא אזור זמן
+          const t = Date.parse(data.dateTime.slice(0, 19) + "+03:00");
+          if (isNaN(t)) throw new Error();
+          return t;
+        },
+        async () => {
+          // גיבוי: כותרת Date מהשרת שמארח את הדף
+          const res = await fetchWithTimeout(location.href, { method: "HEAD" });
+          const t = Date.parse(res.headers.get("Date"));
+          if (isNaN(t)) throw new Error();
+          return t;
+        }
+      ];
+
+      for (const source of sources) {
+        try {
+          return await source();
+        } catch (e) {
+          // ננסה את המקור הבא
+        }
+      }
+      // גיבוי אחרון: שעון המכשיר
+      return Date.now();
+    }
+
+    function show(title, subtitle, loading = false) {
+      titleEl.textContent = title;
+      subtitleEl.textContent = subtitle || "";
+      spinnerEl.classList.toggle("hidden", !loading);
+    }
+
+    async function init() {
+      const serverNow = await getServerTime();
+      // הפרש בין שעון השרת לשעון המכשיר, כדי להמשיך לספור בלי לפנות שוב ל-API
+      const offset = serverNow - Date.now();
+      const now = () => Date.now() + offset;
+
+      function check() {
+        const t = now();
+        if (t < START) {
+          show("עוד לא התחיל השידור...", "השידור יתחיל ב-27/09/2026 בשעה 21:30");
+          return false;
+        }
+        if (t >= END) {
+          show("השידור כבר הסתיים...");
+          return true;
+        }
+        show("צפייה מהנה", "מעביר לשידור החי...", true);
+        setTimeout(() => { location.href = LIVE_URL; }, REDIRECT_DELAY_MS);
+        return true;
+      }
+
+      if (!check()) {
+        // אם השידור עוד לא התחיל, בודקים שוב כל שנייה כדי להעביר אוטומטית כשהוא מתחיל
+        const interval = setInterval(() => {
+          if (check()) clearInterval(interval);
+        }, 1000);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
