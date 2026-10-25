@@ -34,7 +34,7 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
     }
     h1 { margin: 0 0 12px; font-size: 2rem; }
-    p { margin: 0; color: var(--muted); font-size: 1rem; }
+    p { margin: 0; color: var(--muted); font-size: 1.05rem; line-height: 1.6; white-space: pre-line; }
     .spinner {
       width: 36px;
       height: 36px;
@@ -56,16 +56,54 @@
   </div>
 
   <script>
-    // חלון השידור לפי שעון ישראל (27/09/2026 - שעון קיץ, UTC+3)
-    const START = Date.parse("2026-09-27T21:30:00+03:00");
-    const END = Date.parse("2026-09-27T22:00:00+03:00");
+    // קופה ראשית - שידור שבועי, כל יום ראשון 21:30-22:00 לפי שעון ישראל
+    const TZ = "Asia/Jerusalem";
+    const SHOW_NAME = "קופה ראשית";
+    const SHOW_WEEKDAY = 0;                 // 0 = יום ראשון
+    const START_MIN = 21 * 60 + 30;         // 21:30
+    const END_MIN = 22 * 60;                // 22:00
     const LIVE_URL = "https://www.kan.org.il/live/";
-    const REDIRECT_DELAY_MS = 3000;
+    const JOIN_DELAY_MS = 3000;             // נכנס כשהשידור כבר רץ
+    const START_DELAY_MS = 5000;            // חיכה בדף עד שהשידור התחיל
 
     const titleEl = document.getElementById("title");
     const subtitleEl = document.getElementById("subtitle");
     const spinnerEl = document.getElementById("spinner");
 
+    // ---------- זמן ישראל (כולל מעבר בין שעון קיץ לחורף) ----------
+    const WEEKDAYS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const israelFmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: TZ,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      weekday: "short",
+      hourCycle: "h23"
+    });
+
+    function israelParts(ms) {
+      const p = {};
+      for (const part of israelFmt.formatToParts(new Date(ms))) p[part.type] = part.value;
+      return {
+        y: +p.year, m: +p.month, d: +p.day,
+        h: +p.hour, mi: +p.minute, s: +p.second,
+        wd: WEEKDAYS[p.weekday]
+      };
+    }
+
+    function tzOffsetMs(ms) {
+      const p = israelParts(ms);
+      return Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s) - Math.floor(ms / 1000) * 1000;
+    }
+
+    // שעה מקומית בישראל -> זמן אבסולוטי
+    function israelToEpoch(y, mo, d, h, mi, s) {
+      const guess = Date.UTC(y, mo - 1, d, h, mi, s);
+      let t = guess - tzOffsetMs(guess);
+      t = guess - tzOffsetMs(t);
+      return t;
+    }
+
+    // ---------- זמן מדויק משרת חיצוני ----------
     async function fetchWithTimeout(url, options = {}, ms = 5000) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ms);
@@ -90,9 +128,9 @@
           if (!res.ok) throw new Error();
           const data = await res.json();
           // dateTime מוחזר כשעה מקומית בישראל ללא אזור זמן
-          const t = Date.parse(data.dateTime.slice(0, 19) + "+03:00");
-          if (isNaN(t)) throw new Error();
-          return t;
+          const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(data.dateTime);
+          if (!m) throw new Error();
+          return israelToEpoch(+m[1], +m[2], +m[3], +m[4], +m[5], +m[6]);
         },
         async () => {
           // גיבוי: כותרת Date מהשרת שמארח את הדף
@@ -114,6 +152,34 @@
       return Date.now();
     }
 
+    // ---------- לוגיקת השידור ----------
+    // מחזיר: before (לפני השידור הקרוב), live (השידור רץ), ended (השידור הסתיים להיום)
+    // ובנוסף את התאריך של השידור הבא
+    function getStatus(ms) {
+      const p = israelParts(ms);
+      const minutes = p.h * 60 + p.mi;
+      let state, daysAhead;
+
+      if (p.wd === SHOW_WEEKDAY) {
+        if (minutes < START_MIN) { state = "before"; daysAhead = 0; }
+        else if (minutes < END_MIN) { state = "live"; daysAhead = 0; }
+        else { state = "ended"; daysAhead = 7; }
+      } else {
+        state = "before";
+        daysAhead = (SHOW_WEEKDAY - p.wd + 7) % 7;
+      }
+
+      const next = new Date(Date.UTC(p.y, p.m - 1, p.d + daysAhead));
+      const dd = String(next.getUTCDate()).padStart(2, "0");
+      const mm = String(next.getUTCMonth() + 1).padStart(2, "0");
+      const yyyy = next.getUTCFullYear();
+      return { state, nextDate: `${dd}/${mm}/${yyyy}` };
+    }
+
+    function nextBroadcastText(nextDate) {
+      return `יום ראשון, ${nextDate}\nבשעה 21:30`;
+    }
+
     function show(title, subtitle, loading = false) {
       titleEl.textContent = title;
       subtitleEl.textContent = subtitle || "";
@@ -126,27 +192,48 @@
       const offset = serverNow - Date.now();
       const now = () => Date.now() + offset;
 
-      function check() {
-        const t = now();
-        if (t < START) {
-          show("עוד לא התחיל השידור...", "השידור יתחיל ב-27/09/2026 בשעה 21:30");
-          return false;
+      let previousState = null;   // המצב בבדיקה הקודמת
+      let redirectAt = null;      // מתי להעביר לשידור (זמן מכשיר)
+      let redirectMessage = "";
+
+      function tick() {
+        // כבר בתהליך הפניה - מעדכנים רק את הספירה לאחור
+        if (redirectAt !== null) {
+          const secondsLeft = Math.max(1, Math.ceil((redirectAt - Date.now()) / 1000));
+          const unit = secondsLeft === 1 ? "שנייה" : `${secondsLeft} שניות`;
+          subtitleEl.textContent = `${redirectMessage}\nמעביר אותך בעוד ${unit}...`;
+          return;
         }
-        if (t >= END) {
-          show("השידור כבר הסתיים...");
-          return true;
+
+        const { state, nextDate } = getStatus(now());
+
+        if (state === "live") {
+          if (previousState === null) {
+            // נכנס כשהשידור כבר רץ
+            redirectMessage = "השידור כבר התחיל, צפייה מהנה";
+            redirectAt = Date.now() + JOIN_DELAY_MS;
+            show("השידור כבר התחיל!", "", true);
+          } else {
+            // חיכה בדף עד שהשידור התחיל
+            redirectMessage = "צפייה מהנה";
+            redirectAt = Date.now() + START_DELAY_MS;
+            show("השידור מתחיל עכשיו!", "", true);
+          }
+          const target = redirectAt;
+          setTimeout(() => { location.href = LIVE_URL; }, target - Date.now());
+          tick();
+        } else if (state === "ended") {
+          show("השידור הסתיים", `השידור הבא של ${SHOW_NAME}:\n${nextBroadcastText(nextDate)}`);
+        } else {
+          show("השידור עוד לא התחיל", `השידור של ${SHOW_NAME} יתחיל ב:\n${nextBroadcastText(nextDate)}`);
         }
-        show("צפייה מהנה", "מעביר לשידור החי...", true);
-        setTimeout(() => { location.href = LIVE_URL; }, REDIRECT_DELAY_MS);
-        return true;
+
+        previousState = state;
       }
 
-      if (!check()) {
-        // אם השידור עוד לא התחיל, בודקים שוב כל שנייה כדי להעביר אוטומטית כשהוא מתחיל
-        const interval = setInterval(() => {
-          if (check()) clearInterval(interval);
-        }, 1000);
-      }
+      tick();
+      // בודקים כל שנייה כדי להעביר אוטומטית כשהשידור מתחיל ולעדכן מצבים
+      setInterval(tick, 1000);
     }
 
     init();
