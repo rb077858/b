@@ -2,11 +2,11 @@
 //  פאנל ניהול "קופה ראשית" - reembir.com/b/admin
 //  כניסה עם Google (רק rb077858@gmail.com). כל שינוי נשמר אוטומטית ל-Firestore.
 // =====================================================================
-import { app, db, SDK, ADMIN_EMAIL, firebaseConfig } from "../firebase/config.js?v=20261101d";
+import { app, db, SDK, ADMIN_EMAIL, firebaseConfig } from "../firebase/config.js?v=20261101e";
 import {
   SITE_ID, DEFAULT_CONFIG, PRESETS, FONTS, DAY_NAMES, mergeConfig, buildWindows, getStatus,
   israelParts, dateKey, todayKey, formatCountdown, isTime, isDate, pad2, uid
-} from "../kupa-rashit/schedule.js?v=20261101d";
+} from "../kupa-rashit/schedule.js?v=20261101e";
 
 const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } =
   await import(`${SDK}/firebase-auth.js`);
@@ -586,12 +586,6 @@ const VIEWS = {
         <h3>נכנסים באמצע התוכנית</h3>
         <p class="hint">מה קורה כשצופה נכנס אחרי שהתוכנית כבר התחילה.</p>
         ${choices("player.joinMode", [["ask", "לשאול את הצופה", "מציג כפתור \"מההתחלה\"", true], ["start", "מתחילת התוכנית", "תמיד מהדקה הראשונה"], ["live", "ישר לשידור החי", "בלי לשאול"]])}
-      </div>
-
-      <div class="card">
-        <h3>שמירת מיקום</h3>
-        <p class="hint">צופה שיצא מהדף וחזר באותה תוכנית יכול להמשיך מאיפה שעצר.</p>
-        ${choices("player.resume", [["ask", "לשאול", "\"להמשיך מאיפה שעצרתם?\"", true], ["auto", "אוטומטית", "ממשיך לבד"], ["off", "כבוי", "תמיד מהשידור החי"]])}
       </div>
 
       <div class="card">

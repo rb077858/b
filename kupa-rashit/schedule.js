@@ -56,7 +56,6 @@ export const DEFAULT_CONFIG = {
     delayMax: 40,
     viewerDelay: true,       // לאפשר לצופה לשנות השהיה בהגדרות הנגן
     joinMode: "ask",         // live = ישר לשידור החי | start = מתחילת התוכנית | ask = לשאול
-    resume: "ask",           // auto | ask | off - המשך מאיפה שהצופה עצר
     afterEnd: "stop",        // stop = לעצור בסוף התוכנית | continue = להמשיך לנגן את הערוץ
     endGraceMinutes: 2,
     replayHours: 3,          // צפייה חוזרת אחרי השידור (0 = כבוי)
