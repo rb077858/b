@@ -126,7 +126,7 @@
     import {
       DEFAULT_CONFIG, mergeConfig, getStatus, getServerTime, formatCountdown, windowDateText, SITE_ID,
       lastEnded, windowKey, pad2
-    } from "./schedule.js";
+    } from "./schedule.js?v=20261101b";
 
     const $ = id => document.getElementById(id);
     const params = new URLSearchParams(location.search);
@@ -253,7 +253,7 @@
       document.body.classList.add("watching");
       renderPlayerHead();
 
-      const { Player } = await import("./player.js");
+      const { Player } = await import("./player.js?v=20261101b");
       if (!playing || playing.key !== key) return;
       player = new Player($("player"), {
         cfg: p, texts: cfg.texts, fallbackUrl: cfg.defaults.liveUrl,
@@ -405,7 +405,7 @@
       const fallback = setTimeout(() => { if (!gotRemote && !cfg) setConfig(DEFAULT_CONFIG); }, 6000);
       if (!PREVIEW) {
         try {
-          const { db, SDK } = await import("../firebase/config.js");
+          const { db, SDK } = await import("../firebase/config.js?v=20261101b");
           const { doc, onSnapshot } = await import(`${SDK}/firebase-firestore.js`);
           onSnapshot(doc(db, "sites", SITE_ID), snap => {
             gotRemote = true; clearTimeout(fallback);
