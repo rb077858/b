@@ -175,7 +175,7 @@
     import {
       DEFAULT_CONFIG, mergeConfig, getStatus, getServerTime, formatCountdown, windowDateText, SITE_ID,
       lastEnded, windowKey, pad2
-    } from "./schedule.js?v=20261101g";
+    } from "./schedule.js?v=20261101h";
 
     const $ = id => document.getElementById(id);
     const params = new URLSearchParams(location.search);
@@ -297,6 +297,9 @@
       const p = cfg.player;
       const nowMs = now();
       const key = win ? windowKey(win) : "channel";
+      // "משדרים עכשיו" מהפאנל: אין תוכנית מהלוח (אין תאריך/שעה) - מנגנים את הערוץ
+      const forcedStream = win?.forced ? win.stream : "";
+      if (win?.forced) win = null;
       if (playing && playing.key === key && playing.kind === kind) return;
       stopPlayer(true);
       playing = { key, kind, win };
@@ -305,13 +308,13 @@
       document.body.classList.add("watching");
       renderPlayerHead();
 
-      const { Player } = await import("./player.js?v=20261101g");
+      const { Player } = await import("./player.js?v=20261101h");
       if (!playing || playing.key !== key) return;
       player = new Player($("player"), {
         cfg: p, texts: cfg.texts, fallbackUrl: cfg.defaults.liveUrl,
         onEnd: () => { finished.add(key); stopPlayer(); tick(); }
       });
-      const src = (win && win.stream) || p.source;
+      const src = (win && win.stream) || forcedStream || p.source;
       const grace = (+p.endGraceMinutes || 0) * 60e3;
       let dvrMs = (+p.dvrMinutes || 0) * 60e3, startAt = "live", endAt = null;
       if (win) {
@@ -516,9 +519,11 @@
       setTimeout(() => { if (!cfg) return; reveal(); }, 1500);
       if (!PREVIEW) {
         try {
-          const { db, SDK } = await import("../firebase/config.js?v=20261101g");
+          const { db, SDK } = await import("../firebase/config.js?v=20261101h");
           const { doc, onSnapshot } = await import(`${SDK}/firebase-firestore.js`);
           onSnapshot(doc(db, "sites", SITE_ID), snap => {
+            // תשובה ריקה מהמטמון (בלי חיבור) - לא דורסים את ההגדרות השמורות
+            if (!snap.exists() && snap.metadata.fromCache) { if (!cfg) setConfig(DEFAULT_CONFIG); reveal(); return; }
             gotRemote = true; clearTimeout(fallback);
             const data = snap.exists() ? snap.data() : DEFAULT_CONFIG;
             const { updatedAt, updatedBy, ...clean } = data;
