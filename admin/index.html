@@ -4,30 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>ניהול - reembir/b</title>
+  <title>ניהול - קופה ראשית</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="admin.css">
   <script>
-    // ערכת הצבעים של הפאנל נטענת לפני הציור כדי למנוע הבהוב
     try {
       const t = localStorage.getItem("adm-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
       document.documentElement.dataset.theme = t;
-      const a = localStorage.getItem("adm-accent");
-      if (a) document.documentElement.style.setProperty("--a", a);
     } catch (e) {}
   </script>
 </head>
 <body>
   <div id="boot" class="loader"><div class="spin"></div></div>
 
-  <!-- כניסה -->
   <section id="login" class="login hidden">
     <div class="login-card">
-      <div class="login-logo">b</div>
-      <h1>פאנל ניהול</h1>
-      <p>כניסה עם חשבון Google המורשה בלבד</p>
+      <div class="login-logo">📺</div>
+      <h1>ניהול קופה ראשית</h1>
+      <p>כניסה עם חשבון Google המורשה</p>
       <button id="loginBtn" class="gbtn">
         <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
         התחברות עם Google
@@ -36,45 +32,27 @@
     </div>
   </section>
 
-  <!-- אפליקציה -->
-  <div id="app" class="app hidden">
-    <aside id="side" class="side">
-      <div class="brand">
-        <div class="dot">b</div>
-        <div><b>reembir / b</b><small>פאנל ניהול</small></div>
-      </div>
-      <div id="nav"></div>
-      <div class="side-foot">
-        <img id="avatar" alt="" referrerpolicy="no-referrer">
-        <div class="who"><b id="whoName"></b><small id="whoMail"></small></div>
-        <button id="logoutBtn" class="btn ghost icon" title="התנתקות" aria-label="התנתקות"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
-      </div>
-    </aside>
-    <div id="scrim" class="hidden"></div>
-
-    <main class="main">
-      <div class="topbar">
-        <button id="menuBtn" class="btn icon menu-btn" aria-label="תפריט">☰</button>
-        <div>
-          <h2 id="pageTitle"></h2>
-          <div class="sub" id="pageSub"></div>
+  <div id="app" class="hidden">
+    <header class="hdr">
+      <div class="hdr-in">
+        <div class="hdr-top">
+          <div class="brand">
+            <div class="dot">📺</div>
+            <div><b>קופה ראשית</b><span id="saveState" class="save-state"><i></i><span>כל שינוי נשמר אוטומטית</span></span></div>
+          </div>
+          <span class="grow"></span>
+          <button id="undoBtn" class="btn ghost sm" disabled title="ביטול השינוי האחרון">↶ <span class="hide-sm">ביטול</span></button>
+          <a id="openSite" class="btn sm" href="../kupa-rashit/" target="_blank" rel="noopener">צפייה בדף ↗</a>
+          <button id="themeBtn" class="btn ghost icon" title="מצב כהה/בהיר" aria-label="מצב כהה/בהיר"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+          <button id="logoutBtn" class="btn ghost icon" title="התנתקות"><img id="avatar" class="avatar" alt="" referrerpolicy="no-referrer"></button>
         </div>
-        <div class="grow"></div>
-        <span id="sync" class="sync"><i></i><span>מחובר</span></span>
-        <div class="accent-pick" id="accentPick" title="צבע הפאנל"></div>
-        <button id="themeBtn" class="btn icon" title="מצב כהה/בהיר" aria-label="מצב כהה/בהיר"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
-        <a id="openSite" class="btn" target="_blank" rel="noopener">פתיחת הדף ↗</a>
+        <nav id="tabs" class="tabs"></nav>
       </div>
-      <div id="view"></div>
-    </main>
+    </header>
+    <main id="view" class="wrap"></main>
   </div>
 
-  <div id="savebar" class="savebar">
-    <span class="dotw"></span>
-    <span id="saveMsg">יש שינויים שלא נשמרו</span>
-    <button id="discardBtn" class="btn sm">ביטול</button>
-    <button id="saveBtn" class="btn sm primary">שמירה <kbd>Ctrl+S</kbd></button>
-  </div>
+  <dialog id="dlg"></dialog>
   <div id="toasts" class="toasts"></div>
 
   <script type="module" src="admin.js"></script>
