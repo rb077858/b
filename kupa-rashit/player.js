@@ -235,7 +235,14 @@ export class Player {
       this.el.spin.classList.remove("hide");
       if (this.played && !v.seeking && !v.paused) this.stallStart = Date.now();
     });
-    v.addEventListener("seeking", () => { this.stallStart = 0; });
+    v.addEventListener("seeking", () => {
+      this.stallStart = 0;
+      if (this.p?.clip && this.offset != null) {
+        const [s, e] = this.range();
+        if (e > s && (v.currentTime < s - 0.5 || v.currentTime > e + 0.5)) v.currentTime = clamp(v.currentTime, s, e - 0.5);
+      }
+    });
+    v.addEventListener("ended", () => { if (this.p?.replay) this.o.onEnd?.(); });
     v.addEventListener("volumechange", () => this.syncUi());
     v.addEventListener("timeupdate", () => this.onTime());
     for (const ev of ["loadedmetadata", "canplay", "progress"]) v.addEventListener(ev, () => { if (!this.readyDone) this.onReady(); });
@@ -291,13 +298,19 @@ export class Player {
     this.played = false;
     this.el.spin.classList.remove("hide");
     this.hideBanner();
-    const src = this.buildSrc(p.src, p.dvrMs);
+    this.vod = false;
+    this.el.live.classList.toggle("hide", !!p.replay);
+    let src = this.buildSrc(p.src, p.dvrMs);
     this.mediaSession();
     const v = this.el.video;
     const canNative = v.canPlayType("application/vnd.apple.mpegurl");
     let Hls = null;
     try { Hls = await loadHls(); } catch (e) {}
     if (Hls && Hls.isSupported()) {
+      if (p.clip) {
+        try { src = await this.buildVod(p.src, p.clip.from, p.clip.to); this.vod = true; }
+        catch (e) { /* נשארים עם השידור הרגיל, והטווח נאכף בנגן */ }
+      }
       this.destroyHls();
       const hls = this.hls = new Hls({
         liveSyncDuration: this.delay,
@@ -327,6 +340,50 @@ export class Player {
     if (this.cfg.autoplay !== false) this.play(false);
     else { this.el.spin.classList.add("hide"); this.el.big.classList.remove("hide"); }
   }
+
+  // בונה "פרק מוקלט" מדויק מהשרת: רשימת קטעים מתחילת התוכנית ועד סופה בלבד.
+  // בשרת הזה כל קטע מזוהה לפי startTime (מילישניות מאז 2001-01-01, ברשת של 4 שניות).
+  async buildVod(src, from, to) {
+    const get = async u => { const r = await fetch(u, { cache: "no-store" }); if (!r.ok) throw new Error(r.status); return r.text(); };
+    const master = await get(src);
+    const lines = master.split(/\r?\n/);
+    const variants = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i].startsWith("#EXT-X-STREAM-INF")) continue;
+      const uri = lines.slice(i + 1).find(l => l && !l.startsWith("#"));
+      if (uri) variants.push({ inf: lines[i], url: new URL(uri, src) });
+    }
+    if (!variants.length) throw new Error("no variants");
+    const v0 = await get(variants[0].url);
+    const fr = v0.split(/\r?\n/).find(l => /startTime=\d+/.test(l));
+    if (!fr) throw new Error("no startTime");
+    const firstStart = +/startTime=(\d+)/.exec(fr)[1];
+    const pdt = /#EXT-X-PROGRAM-DATE-TIME:(\S+)/.exec(v0);
+    const base = pdt ? Date.parse(pdt[1]) - firstStart : 978307200000;
+    const segMs = Math.round(+(/#EXTINF:([\d.]+)/.exec(v0)?.[1] || 4) * 1000);
+    const phase = ((firstStart % segMs) + segMs) % segMs;
+    const fragUrl = new URL(fr, variants[0].url);
+    const t0 = Math.floor((from - base - phase) / segMs) * segMs + phase;
+    const tEnd = to - base;
+    if (tEnd - t0 > MAX_DVR_MS || tEnd <= t0) throw new Error("bad range");
+    const dvrParam = (this.cfg.dvrParam || "").trim();
+    this.revokeVod();
+    this.blobs = [];
+    const blob = txt => { const u = URL.createObjectURL(new Blob([txt], { type: "application/vnd.apple.mpegurl" })); this.blobs.push(u); return u; };
+    const parts = variants.map(v => {
+      const u = new URL(fragUrl);
+      u.search = v.url.search;
+      if (dvrParam) u.searchParams.delete(dvrParam);
+      let out = `#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:${Math.ceil(segMs / 1000)}\n#EXT-X-MEDIA-SEQUENCE:0\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-PROGRAM-DATE-TIME:${new Date(base + t0).toISOString()}\n`;
+      for (let t = t0; t < tEnd; t += segMs) {
+        u.searchParams.set("startTime", String(t));
+        out += `#EXTINF:${(segMs / 1000).toFixed(3)},\n${u.href}\n`;
+      }
+      return v.inf + "\n" + blob(out + "#EXT-X-ENDLIST\n");
+    });
+    return blob("#EXTM3U\n" + parts.join("\n") + "\n");
+  }
+  revokeVod() { (this.blobs || []).forEach(u => URL.revokeObjectURL(u)); this.blobs = []; }
 
   buildSrc(src, dvrMs) {
     const param = (this.cfg.dvrParam || "").trim();
@@ -375,11 +432,20 @@ export class Player {
   posOf(absMs) { return this.offset == null ? null : absMs / 1000 + this.offset; }
   absOf(pos) { return this.offset == null ? null : (pos - this.offset) * 1000; }
   range() {
+    let r = [0, 0];
     const s = this.el.video.seekable;
-    if (s && s.length) return [s.start(0), s.end(s.length - 1)];
-    const det = this.hls?.levels?.[Math.max(0, this.hls.currentLevel)]?.details;
-    if (det) return [det.fragments[0]?.start || 0, det.edge];
-    return [0, 0];
+    if (s && s.length) r = [s.start(0), s.end(s.length - 1)];
+    else {
+      const det = this.hls?.levels?.[Math.max(0, this.hls.currentLevel)]?.details;
+      if (det) r = [det.fragments[0]?.start || 0, det.edge];
+    }
+    // צפייה חוזרת: רק טווח התוכנית
+    const c = this.p?.clip;
+    if (c && this.offset != null) {
+      const a = this.posOf(c.from), b = this.posOf(c.to);
+      r = [Math.max(r[0], a), Math.max(Math.max(r[0], a), Math.min(r[1], b))];
+    }
+    return r;
   }
   edge() { return this.range()[1]; }
   latency() { return this.edge() - this.el.video.currentTime; }
@@ -400,7 +466,7 @@ export class Player {
     }
     if (target != null) {
       target = clamp(target, s + 0.5, e - 2);
-      this.following = e - target < this.delay + 8;
+      this.following = !p.replay && e - target < this.delay + 8;
       v.currentTime = target;
     } else {
       this.following = true;
@@ -439,15 +505,16 @@ export class Player {
   toggleMute() { const v = this.el.video; v.muted = !v.muted; if (!v.muted && v.volume === 0) v.volume = 1; this.prefs.muted = v.muted; this.savePrefs(); this.el.unmute.classList.add("hide"); }
   skip(sec, tap) {
     const v = this.el.video, [s, e] = this.range();
-    const t = clamp(v.currentTime + sec, s + 0.5, e - Math.min(this.delay, 4));
+    const t = clamp(v.currentTime + sec, s + (this.p?.clip ? 0 : 0.5), e - (this.p?.replay ? 0.5 : Math.min(this.delay, 4)));
     v.currentTime = t;
-    this.following = sec < 0 ? false : e - t < this.delay + 6;
+    this.following = this.p?.replay ? false : sec < 0 ? false : e - t < this.delay + 6;
     if (this.following) v.playbackRate = 1;
     if (tap) { const el = sec < 0 ? this.el.tapL : this.el.tapR; el.textContent = (sec < 0 ? "−" : "+") + Math.abs(sec); el.classList.add("show"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("show"), 600); }
     this.syncUi();
   }
   seekAbs(abs) { const p = this.posOf(abs); if (p == null) return; const [s, e] = this.range(); this.el.video.currentTime = clamp(p, s + 0.5, e - 2); this.following = e - p < this.delay + 6; this.play(true); this.syncUi(); }
   goLive(user) {
+    if (this.p?.replay) return;
     const v = this.el.video;
     this.following = true;
     v.currentTime = Math.max(this.range()[0], this.edge() - this.delay);
@@ -513,6 +580,7 @@ export class Player {
       this.setDelay(Math.max(this.dMin, this.delay - 2)); this.lastAdjustAt = Date.now();
     }
     // שמירה על ההשהיה בזמן צפייה בשידור החי (שינוי מהירות עדין במקום קפיצות)
+    if (this.p?.replay) this.following = false;
     if (this.following && !v.paused && !v.seeking && this.prefs.speed === 1) {
       const lat = this.latency();
       let rate = 1;
@@ -522,7 +590,7 @@ export class Player {
       if (Math.abs(v.playbackRate - rate) > 0.001) v.playbackRate = rate;
     }
     if (!this.following && this.prefs.speed !== 1 && v.playbackRate !== this.prefs.speed) v.playbackRate = this.prefs.speed;
-    if (this.prefs.speed > 1 && this.latency() < this.delay) { this.prefs.speed = 1; v.playbackRate = 1; this.following = true; this.toast("הגעתם לשידור החי"); }
+    if (!this.p?.replay && this.prefs.speed > 1 && this.latency() < this.delay) { this.prefs.speed = 1; v.playbackRate = 1; this.following = true; this.toast("הגעתם לשידור החי"); }
     if (this.prefs.stats) this.renderStats();
     this.syncUi();
   }
@@ -563,12 +631,13 @@ export class Player {
     const ba = this.bufferAhead();
     this.el.buf.style.width = clamp((cur + ba - s) / span, 0, 1) * 100 + "%";
     const lat = e - cur;
-    const atLive = this.following && lat < this.delay + 8;
+    const atLive = !this.p?.replay && this.following && lat < this.delay + 8;
     this.el.live.classList.toggle("on", atLive);
     const t = this.o.texts || {};
     this.el.liveTxt.textContent = atLive ? (t.liveBadge || "שידור חי") : "לשידור החי ›";
     const abs = this.absOf(cur);
-    this.el.time.textContent = abs != null ? clock(abs) + (atLive ? "" : `  (−${dur(lat - this.delay > 0 ? lat - this.delay : lat)})`) : "";
+    if (this.p?.replay) this.el.time.textContent = `${dur(cur - s)} / ${dur(e - s)}`;
+    else this.el.time.textContent = abs != null ? clock(abs) + (atLive ? "" : `  (−${dur(lat - this.delay > 0 ? lat - this.delay : lat)})`) : "";
     if (this.p?.win && this.offset != null) {
       const sp = this.posOf(this.p.win.start);
       if (sp > s && sp < e) { this.el.mark.classList.remove("hide"); this.el.mark.style.left = ((sp - s) / span) * 100 + "%"; }
@@ -594,7 +663,7 @@ export class Player {
       this.dragging = false; sk.classList.remove("drag");
       const pos = show(at(ev));
       const e = this.edge();
-      if (e - pos < this.delay + 6) this.goLive();
+      if (!this.p?.replay && e - pos < this.delay + 6) this.goLive();
       else { this.following = false; this.el.video.currentTime = pos; }
       this.syncUi();
     };
@@ -677,7 +746,7 @@ export class Player {
       if (this.cfg.viewerDelay) h += `<button class="mi" data-m="delay"><span>השהיה מהשידור</span><span>${this.mode === "auto" ? "אוטומטית" : "קבועה"} · ${this.delay} שנ׳ ‹</span></button>`;
       if (this.cfg.showStatsOption !== false) h += `<button class="mi" data-t="stats"><span>נתונים טכניים</span>${sw(this.prefs.stats)}</button>`;
       if (this.p?.win && !this.el.restart.classList.contains("hide")) h += `<button class="mi" data-x="restart"><span>⏮ מתחילת התוכנית</span><span></span></button>`;
-      h += `<button class="mi" data-x="live"><span>● לשידור החי</span><span></span></button>`;
+      if (!this.p?.replay) h += `<button class="mi" data-x="live"><span>● לשידור החי</span><span></span></button>`;
       h += `<button class="mi" data-m="keys"><span>מקשי קיצור</span><span>‹</span></button>`;
     } else if (page === "quality") {
       h += head("איכות");
@@ -756,6 +825,7 @@ export class Player {
 
   destroyHls() { if (this.hls) { this.hls.destroy(); this.hls = null; } }
   destroy() {
+    this.revokeVod();
     this.destroyHls();
     this.timers.forEach(clearInterval);
     this.releaseWake();
