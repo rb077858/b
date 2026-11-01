@@ -2,11 +2,11 @@
 //  פאנל ניהול "קופה ראשית" - reembir.com/b/admin
 //  כניסה עם Google (רק rb077858@gmail.com). כל שינוי נשמר אוטומטית ל-Firestore.
 // =====================================================================
-import { app, db, SDK, ADMIN_EMAIL, firebaseConfig } from "../firebase/config.js?v=20261101c";
+import { app, db, SDK, ADMIN_EMAIL, firebaseConfig } from "../firebase/config.js?v=20261101d";
 import {
   SITE_ID, DEFAULT_CONFIG, PRESETS, FONTS, DAY_NAMES, mergeConfig, buildWindows, getStatus,
   israelParts, dateKey, todayKey, formatCountdown, isTime, isDate, pad2, uid
-} from "../kupa-rashit/schedule.js?v=20261101c";
+} from "../kupa-rashit/schedule.js?v=20261101d";
 
 const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } =
   await import(`${SDK}/firebase-auth.js`);
