@@ -4,328 +4,273 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>שידור חי - כאן</title>
-
-  <!-- ====================================================================
-       ⚙️  הגדרות - זה המקום היחיד שצריך לערוך. אין צורך לגעת בשאר הקוד.
-       ====================================================================
-
-       איך זה עובד:
-       הדף בודק מה השעה בישראל. כשמגיעה שעת שידור הוא מעביר אוטומטית
-       לקישור של אותו שידור. לפני כן הוא מציג "השידור עוד לא התחיל" ומתי השידור הבא.
-
-       כללים כלליים:
-       • שעות כותבים בפורמט "HH:MM" בשעון 24 שעות, למשל "21:30".
-       • שעת הסיום חייבת להיות אחרי שעת ההתחלה, באותו יום.
-       • תאריכים כותבים בפורמט "YYYY-MM-DD", למשל "2026-12-25".
-       • כל שורה מופרדת בפסיק בסופה, ושימו לב לא למחוק גרשיים או סוגריים.
-       • אם משאירים שדה "name" או "url" ריקים, נלקחים ערכי ברירת המחדל שלמטה.
-       ==================================================================== -->
-  <script>
-    // ---------- 1. ברירות מחדל ----------
-    const DEFAULT_SHOW_NAME = "קופה ראשית";               // שם התוכנית כשלא הוגדר שם אחר
-    const DEFAULT_LIVE_URL  = "https://www.kan.org.il/live/"; // לאן להעביר כשלא הוגדר קישור אחר
-
-    // ---------- 2. שעות קבועות (חוזרות כל שבוע) ----------
-    // day: 0=ראשון, 1=שני, 2=שלישי, 3=רביעי, 4=חמישי, 5=שישי, 6=שבת
-    //
-    // להוסיף שעה קבועה: להעתיק שורה אחת ולשנות את הערכים.
-    // למחוק שעה קבועה: למחוק את כל השורה שלה (או להפוך אותה להערה עם // בתחילתה).
-    // לשנות שעה: לשנות את start / end בשורה.
-    // אפשר גם להוסיף לשורה  url: "קישור אחר"  או  name: "שם אחר"  רק לשעה הזו.
-    //
-    // דוגמה לשורה עם קישור ושם משלה:
-    //   { day: 3, start: "20:00", end: "21:00", name: "תוכנית אחרת", url: "https://example.com" },
-    const WEEKLY_SCHEDULE = [
-      { day: 0, start: "21:30", end: "22:00" },   // כל יום ראשון 21:30-22:00
-    ];
-
-    // ---------- 3. תאריכים מיוחדים (חד-פעמיים) ----------
-    // כל שורה היא שידור אחד בתאריך מסוים, בנוסף לשעות הקבועות.
-    // שדות אופציונליים: name (שם), url (קישור), label (הערה שמוצגת למשתמש).
-    // למחוק: למחוק את השורה. שידורים שהתאריך שלהם עבר פשוט לא מוצגים יותר.
-    //
-    // דוגמה מלאה:
-    //   { date: "2026-12-25", start: "20:00", end: "21:30",
-    //     name: "ערב חג", url: "https://www.kan.org.il/live/", label: "שידור חגיגי" },
-    const SPECIAL_BROADCASTS = [
-      { date: "2026-10-27", start: "21:30", end: "22:00", label: "פרק מיוחד לכבוד יום הבחירות" },
-    ];
-
-    // ---------- 4. ביטול שידור קבוע בתאריך מסוים ----------
-    // אם בשבוע מסוים אין שידור (חג, למשל), רשמו כאן את התאריך.
-    // רק השעות הקבועות מתבטלות; תאריך מיוחד מסעיף 3 באותו יום עדיין יפעל.
-    const CANCELLED_DATES = [
-      // "2026-12-13",
-    ];
-
-    // ---------- 5. מתקדם (בדרך כלל לא צריך לגעת) ----------
-    const JOIN_DELAY_MS  = 3000;   // כמה זמן להציג הודעה לפני העברה כשנכנסים באמצע שידור
-    const START_DELAY_MS = 5000;   // כמה זמן להציג הודעה לפני העברה כשהשידור מתחיל בזמן שהדף פתוח
-  </script>
-  <!-- ======================= סוף ההגדרות ======================= -->
-
+  <!--
+    כל ההגדרות (שעות, תאריכים, טקסטים, עיצוב) מנוהלות מפאנל הניהול:
+    https://reembir.com/b/admin/
+    ונשמרות ב-Firebase (Firestore) במסמך sites/kupa-rashit.
+    אין צורך לערוך את הקובץ הזה.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link id="fontLink" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;800&display=swap">
   <style>
     :root {
-      --bg: #0f1724;
-      --card: #1b2638;
-      --text: #f2f5fa;
-      --muted: #9aa8bd;
-      --accent: #3fa9f5;
+      --bg: #0f1724; --bg2: #1a2a44; --card: #1b2638; --text: #f2f5fa; --muted: #9aa8bd; --accent: #3fa9f5;
+      --radius: 16px; --card-w: 480px; --title: 2rem; --font: "Heebo", "Segoe UI", Arial, sans-serif;
+      --overlay: .55; --logo: 72px;
     }
     * { box-sizing: border-box; }
+    html, body { height: 100%; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Segoe UI", Arial, sans-serif;
-      padding: 16px;
+      margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: var(--bg); color: var(--text); font-family: var(--font); padding: 16px;
+      position: relative; overflow-x: hidden;
     }
+    body.gradient { background: radial-gradient(1200px 700px at 80% -10%, var(--bg2), transparent 60%), var(--bg); }
+    #bgImage { position: fixed; inset: 0; background-size: cover; background-position: center; z-index: 0; display: none; }
+    #bgImage::after { content: ""; position: absolute; inset: 0; background: var(--bg); opacity: var(--overlay); }
     .card {
-      background: var(--card);
-      border-radius: 16px;
-      padding: 40px 32px;
-      max-width: 480px;
-      width: 100%;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+      position: relative; z-index: 1; background: var(--card); border-radius: var(--radius);
+      padding: 40px 32px; max-width: var(--card-w); width: 100%; text-align: center;
     }
-    h1 { margin: 0 0 12px; font-size: 2rem; }
+    .card.shadow { box-shadow: 0 18px 50px rgba(0,0,0,.35); }
+    .card.glass { background: color-mix(in srgb, var(--card) 55%, transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); }
+    .anim-fade { animation: fade .6s ease both; }
+    .anim-rise { animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
+    .anim-zoom { animation: zoom .6s cubic-bezier(.2,.8,.2,1) both; }
+    @keyframes fade { from { opacity: 0 } }
+    @keyframes rise { from { opacity: 0; transform: translateY(18px) } }
+    @keyframes zoom { from { opacity: 0; transform: scale(.94) } }
+    #logo { display: none; width: var(--logo); height: var(--logo); object-fit: contain; margin: 0 auto 16px; }
+    h1 { margin: 0 0 12px; font-size: var(--title); line-height: 1.2; }
     p { margin: 0; color: var(--muted); font-size: 1.05rem; line-height: 1.6; white-space: pre-line; }
-    .spinner {
-      width: 36px;
-      height: 36px;
-      margin: 0 auto 16px;
-      border: 4px solid rgba(255, 255, 255, 0.15);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.9s linear infinite;
-    }
+    .name { color: var(--text); font-weight: 600; font-size: 1.15rem; }
+    .badge { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-size: .9rem; font-weight: 600; }
+    .countdown { margin-top: 18px; font-variant-numeric: tabular-nums; font-size: 1.6rem; font-weight: 800; color: var(--accent); letter-spacing: .5px; }
+    .countdown small { display: block; font-size: .85rem; font-weight: 400; color: var(--muted); letter-spacing: 0; }
+    .btn { display: inline-block; margin-top: 20px; padding: 12px 26px; border-radius: 999px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
+    .footer { margin-top: 22px; font-size: .85rem; opacity: .8; }
+    .spinner { width: 36px; height: 36px; margin: 0 auto 16px; border: 4px solid color-mix(in srgb, var(--text) 15%, transparent); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .hidden { display: none; }
+    .hidden { display: none !important; }
+    .preview-tag { position: fixed; top: 10px; left: 10px; z-index: 5; background: #000a; color: #fff; font: 12px sans-serif; padding: 4px 10px; border-radius: 6px; }
   </style>
+  <style id="customCss"></style>
 </head>
-<body>
-  <div class="card">
+<body class="gradient">
+  <div id="bgImage"></div>
+  <div class="card shadow anim-rise" id="card">
+    <img id="logo" alt="">
     <div id="spinner" class="spinner"></div>
     <h1 id="title">טוען...</h1>
     <p id="subtitle"></p>
+    <div id="countdown" class="countdown hidden"></div>
+    <a id="btn" class="btn hidden" href="#"></a>
+    <p id="footer" class="footer hidden"></p>
   </div>
 
-  <script>
-    // ===== מכאן והלאה זה הקוד שמריץ את הדף. ההגדרות נמצאות בראש הקובץ. =====
-    const TZ = "Asia/Jerusalem";
-    const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+  <script type="module">
+    import {
+      DEFAULT_CONFIG, mergeConfig, getStatus, getServerTime, formatCountdown, windowDateText, SITE_ID
+    } from "./schedule.js";
 
-    const titleEl = document.getElementById("title");
-    const subtitleEl = document.getElementById("subtitle");
-    const spinnerEl = document.getElementById("spinner");
+    const $ = id => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    const PREVIEW = params.has("preview");
+    const CACHE_KEY = "kr-config-cache";
 
-    // ---------- זמן ישראל (כולל מעבר בין שעון קיץ לחורף) ----------
-    const WEEKDAYS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-    const israelFmt = new Intl.DateTimeFormat("en-GB", {
-      timeZone: TZ,
-      year: "numeric", month: "2-digit", day: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit",
-      weekday: "short",
-      hourCycle: "h23"
-    });
+    let cfg = null;
+    let forcedState = null;     // לתצוגה מקדימה בפאנל הניהול
+    let previousState = null;
+    let redirectAt = null, redirectUrl = null, redirectMessage = "";
+    let offset = 0;
 
-    function israelParts(ms) {
-      const p = {};
-      for (const part of israelFmt.formatToParts(new Date(ms))) p[part.type] = part.value;
-      return {
-        y: +p.year, m: +p.month, d: +p.day,
-        h: +p.hour, mi: +p.minute, s: +p.second,
-        wd: WEEKDAYS[p.weekday]
-      };
+    if (PREVIEW) {
+      const tag = document.createElement("div");
+      tag.className = "preview-tag"; tag.textContent = "תצוגה מקדימה - ללא העברה";
+      document.body.appendChild(tag);
     }
 
-    function tzOffsetMs(ms) {
-      const p = israelParts(ms);
-      return Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s) - Math.floor(ms / 1000) * 1000;
-    }
-
-    // שעה מקומית בישראל -> זמן אבסולוטי
-    function israelToEpoch(y, mo, d, h, mi, s) {
-      const guess = Date.UTC(y, mo - 1, d, h, mi, s);
-      let t = guess - tzOffsetMs(guess);
-      t = guess - tzOffsetMs(t);
-      return t;
-    }
-
-    // ---------- זמן מדויק משרת חיצוני ----------
-    async function fetchWithTimeout(url, options = {}, ms = 5000) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ms);
-      try {
-        return await fetch(url, { ...options, signal: controller.signal, cache: "no-store" });
-      } finally {
-        clearTimeout(timer);
+    // ---------- עיצוב ----------
+    function applyDesign() {
+      const d = cfg.design, r = document.documentElement.style;
+      r.setProperty("--bg", d.bg); r.setProperty("--bg2", d.bg2 || d.bg); r.setProperty("--card", d.card);
+      r.setProperty("--text", d.text); r.setProperty("--muted", d.muted); r.setProperty("--accent", d.accent);
+      r.setProperty("--radius", (+d.radius) + "px"); r.setProperty("--card-w", (+d.cardWidth) + "px");
+      r.setProperty("--title", (+d.titleSize / 16) + "rem"); r.setProperty("--overlay", d.bgOverlay);
+      r.setProperty("--logo", (+d.logoSize) + "px");
+      const font = d.font === "system" ? "" : `"${d.font}", `;
+      r.setProperty("--font", `${font}"Segoe UI", Arial, sans-serif`);
+      if (d.font && d.font !== "system") {
+        $("fontLink").href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(d.font)}:wght@400;600;800&display=swap`;
       }
+      document.body.classList.toggle("gradient", !!d.gradient);
+      const bg = $("bgImage");
+      bg.style.display = d.bgImage ? "block" : "none";
+      bg.style.backgroundImage = d.bgImage ? `url("${d.bgImage}")` : "";
+      const logo = $("logo");
+      logo.style.display = d.logoUrl ? "block" : "none";
+      if (d.logoUrl) logo.src = d.logoUrl;
+      const card = $("card");
+      card.classList.toggle("shadow", !!d.shadow);
+      card.classList.toggle("glass", !!d.glass);
+      card.classList.remove("anim-fade", "anim-rise", "anim-zoom");
+      if (d.animation && d.animation !== "none") card.classList.add("anim-" + d.animation);
+      $("customCss").textContent = d.customCss || "";
+      document.title = cfg.texts.pageTitle || "שידור חי";
+      const f = $("footer");
+      f.textContent = cfg.texts.footer || "";
+      f.classList.toggle("hidden", !cfg.texts.footer);
     }
 
-    // מחזיר את הזמן הנוכחי (במילישניות) לפי שרת זמן חיצוני
-    async function getServerTime() {
-      const sources = [
-        async () => {
-          const res = await fetchWithTimeout("https://worldtimeapi.org/api/timezone/Asia/Jerusalem");
-          if (!res.ok) throw new Error();
-          const data = await res.json();
-          return data.unixtime * 1000;
-        },
-        async () => {
-          const res = await fetchWithTimeout("https://timeapi.io/api/time/current/zone?timeZone=Asia%2FJerusalem");
-          if (!res.ok) throw new Error();
-          const data = await res.json();
-          // dateTime מוחזר כשעה מקומית בישראל ללא אזור זמן
-          const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(data.dateTime);
-          if (!m) throw new Error();
-          return israelToEpoch(+m[1], +m[2], +m[3], +m[4], +m[5], +m[6]);
-        },
-        async () => {
-          // גיבוי: כותרת Date מהשרת שמארח את הדף
-          const res = await fetchWithTimeout(location.href, { method: "HEAD" });
-          const t = Date.parse(res.headers.get("Date"));
-          if (isNaN(t)) throw new Error();
-          return t;
-        }
-      ];
-
-      for (const source of sources) {
-        try {
-          return await source();
-        } catch (e) {
-          // ננסה את המקור הבא
-        }
+    // ---------- תצוגה ----------
+    function show({ title, name = "", lines = [], label = "", loading = false, countdownTo = null, button = null }) {
+      const d = cfg.design;
+      $("title").textContent = title;
+      const sub = $("subtitle");
+      sub.innerHTML = "";
+      for (const [i, line] of lines.entries()) {
+        if (!line) continue;
+        const el = document.createElement(i === 0 && line === name ? "span" : "span");
+        el.textContent = line;
+        if (line === name) el.className = "name";
+        sub.appendChild(el);
+        sub.appendChild(document.createTextNode("\n"));
       }
-      // גיבוי אחרון: שעון המכשיר
-      return Date.now();
+      if (label) {
+        const b = document.createElement("span"); b.className = "badge"; b.textContent = label; sub.appendChild(b);
+      }
+      $("spinner").classList.toggle("hidden", !(loading && d.showSpinner));
+      const cd = $("countdown");
+      cd.classList.toggle("hidden", !(countdownTo && d.showCountdown));
+      cd.dataset.to = countdownTo || "";
+      const btn = $("btn");
+      btn.classList.toggle("hidden", !(button && d.showButton));
+      if (button) { btn.href = button.url; btn.textContent = button.text; }
+      updateCountdown();
     }
 
-    // ---------- לוגיקת השידור ----------
-    function hm(str) { const [h, m] = str.split(":").map(Number); return [h, m]; }
-    const pad2 = n => String(n).padStart(2, "0");
+    function updateCountdown() {
+      const cd = $("countdown");
+      const to = +cd.dataset.to;
+      if (!to) return;
+      const txt = formatCountdown(to - now());
+      cd.innerHTML = "";
+      const s = document.createElement("small"); s.textContent = cfg.texts.countdownLead || "";
+      cd.appendChild(s); cd.appendChild(document.createTextNode(txt));
+    }
 
-    // כל חלונות השידור (קבועים + מיוחדים) בטווח של כמה ימים סביב רגע נתון, בזמן אבסולוטי
-    function buildWindows(ms) {
-      const p = israelParts(ms);
-      const windows = [];
+    function nextLines(w) {
+      const t = cfg.texts, d = cfg.design;
+      return [d.showName ? w.name : "", d.showDate ? windowDateText(w) : "", `בשעה ${w.startText}`];
+    }
 
-      function add(y, mo, d, startStr, endStr, name, url, label) {
-        const [sh, sm] = hm(startStr), [eh, em] = hm(endStr);
-        windows.push({
-          y, mo, d,
-          wd: new Date(Date.UTC(y, mo - 1, d)).getUTCDay(),
-          name: name || DEFAULT_SHOW_NAME,
-          url: url || DEFAULT_LIVE_URL,
-          label: label || "",
-          start: israelToEpoch(y, mo, d, sh, sm, 0),
-          end: israelToEpoch(y, mo, d, eh, em, 0),
-          startText: startStr
-        });
+    const now = () => Date.now() + offset;
+
+    function tick() {
+      if (!cfg) return;
+      const t = cfg.texts;
+
+      if (redirectAt !== null) {
+        const secondsLeft = Math.max(1, Math.ceil((redirectAt - Date.now()) / 1000));
+        const unit = secondsLeft === 1 ? "שנייה" : `${secondsLeft} שניות`;
+        $("subtitle").textContent = `${redirectMessage}\nמעביר אותך בעוד ${unit}...`;
+        if (Date.now() >= redirectAt) { redirectAt = Infinity; location.href = redirectUrl; }
+        return;
       }
 
-      // שעות קבועות
-      for (let i = -1; i <= 14; i++) {
-        const day = new Date(Date.UTC(p.y, p.m - 1, p.d + i));
-        const y = day.getUTCFullYear(), mo = day.getUTCMonth() + 1, d = day.getUTCDate();
-        if (CANCELLED_DATES.includes(`${y}-${pad2(mo)}-${pad2(d)}`)) continue;
-        for (const w of WEEKLY_SCHEDULE) {
-          if (w.day !== day.getUTCDay()) continue;
-          add(y, mo, d, w.start, w.end, w.name, w.url, w.label);
-        }
-      }
+      let status = getStatus(cfg, now());
+      if (forcedState) status = fakeStatus(status, forcedState);
+      const { state, next } = status;
 
-      // תאריכים מיוחדים
-      for (const sp of SPECIAL_BROADCASTS) {
-        const [y, mo, d] = sp.date.split("-").map(Number);
-        add(y, mo, d, sp.start, sp.end, sp.name, sp.url, sp.label);
-      }
-
-      return windows.sort((a, b) => a.start - b.start);
-    }
-
-    // מחזיר: before (לפני השידור הקרוב), live (השידור רץ), ended (השידור הסתיים היום)
-    // ובנוסף את פרטי השידור הרלוונטי (הנוכחי, או הבא)
-    function getStatus(ms) {
-      const windows = buildWindows(ms);
-      const today = israelParts(ms);
-      const current = windows.find(w => ms >= w.start && ms < w.end);
-      const upcoming = windows.find(w => w.start > ms);
-
-      if (current) return { state: "live", next: current };
-      const endedToday = windows.some(w =>
-        ms >= w.end && w.y === today.y && w.mo === today.m && w.d === today.d);
-      return { state: endedToday ? "ended" : "before", next: upcoming };
-    }
-
-    function nextBroadcastText(w) {
-      const lines = [`${w.name}`, `יום ${DAY_NAMES[w.wd]}, ${pad2(w.d)}/${pad2(w.mo)}/${w.y}`, `בשעה ${w.startText}`];
-      if (w.label) lines.push(w.label);
-      return lines.join("\n");
-    }
-
-    function show(title, subtitle, loading = false) {
-      titleEl.textContent = title;
-      subtitleEl.textContent = subtitle || "";
-      spinnerEl.classList.toggle("hidden", !loading);
-    }
-
-    async function init() {
-      const serverNow = await getServerTime();
-      // הפרש בין שעון השרת לשעון המכשיר, כדי להמשיך לספור בלי לפנות שוב ל-API
-      const offset = serverNow - Date.now();
-      const now = () => Date.now() + offset;
-
-      let previousState = null;   // המצב בבדיקה הקודמת
-      let redirectAt = null;      // מתי להעביר לשידור (זמן מכשיר)
-      let redirectMessage = "";
-
-      function tick() {
-        // כבר בתהליך הפניה - מעדכנים רק את הספירה לאחור
-        if (redirectAt !== null) {
-          const secondsLeft = Math.max(1, Math.ceil((redirectAt - Date.now()) / 1000));
-          const unit = secondsLeft === 1 ? "שנייה" : `${secondsLeft} שניות`;
-          subtitleEl.textContent = `${redirectMessage}\nמעביר אותך בעוד ${unit}...`;
+      if (state === "live") {
+        const firstLoad = previousState === null || previousState === "loading";
+        const msg = firstLoad ? t.alreadyLiveMsg : t.startingMsg;
+        const title = firstLoad ? t.alreadyLiveTitle : t.startingTitle;
+        if (PREVIEW || !cfg.advanced.autoRedirect) {
+          show({ title, lines: [msg], loading: false, button: { url: next.url, text: t.redirectBtn } });
+          $("btn").classList.remove("hidden");
+        } else {
+          const delay = (firstLoad ? +cfg.advanced.joinDelaySec : +cfg.advanced.startDelaySec) * 1000;
+          redirectMessage = msg; redirectUrl = next.url; redirectAt = Date.now() + delay;
+          show({ title, loading: true, button: { url: next.url, text: t.redirectBtn } });
+          tick();
           return;
         }
+      } else if (state === "off") {
+        const o = cfg.override || {};
+        show({ title: o.mode === "off" && o.title ? o.title : t.offTitle, lines: [o.mode === "off" && o.message ? o.message : t.offText] });
+      } else if (state === "none" || !next) {
+        show({ title: t.noneTitle, lines: [t.noneText] });
+      } else if (state === "ended") {
+        show({ title: t.endedTitle, lines: [t.endedLead, ...nextLines(next)], label: next.label, countdownTo: next.openAt });
+      } else {
+        show({ title: t.notStartedTitle, lines: [t.notStartedLead, ...nextLines(next)], label: next.label, countdownTo: next.openAt });
+      }
+      previousState = state;
+    }
 
-        const { state, next } = getStatus(now());
+    function fakeStatus(real, state) {
+      const sample = real.next && !real.next.forced ? real.next : {
+        name: cfg.defaults.showName, url: cfg.defaults.liveUrl, label: "", wd: 0, d: 1, mo: 1, y: 2027,
+        startText: "21:30", openAt: now() + 3 * 3600e3 + 125e3
+      };
+      return { state, next: state === "none" ? null : sample };
+    }
 
-        if (state === "live") {
-          if (previousState === null) {
-            // נכנס כשהשידור כבר רץ
-            redirectMessage = "השידור כבר התחיל, צפייה מהנה";
-            redirectAt = Date.now() + JOIN_DELAY_MS;
-            show("השידור כבר התחיל!", "", true);
-          } else {
-            // חיכה בדף עד שהשידור התחיל
-            redirectMessage = "צפייה מהנה";
-            redirectAt = Date.now() + START_DELAY_MS;
-            show("השידור מתחיל עכשיו!", "", true);
-          }
-          const target = redirectAt;
-          const url = next.url;
-          setTimeout(() => { location.href = url; }, target - Date.now());
-          tick();
-        } else if (!next) {
-          show("אין שידורים קרובים", "כרגע לא מתוכנן שידור. כדאי לבדוק שוב בקרוב.");
-        } else if (state === "ended") {
-          show("השידור הסתיים", `השידור הבא:\n${nextBroadcastText(next)}`);
-        } else {
-          show("השידור עוד לא התחיל", `השידור הבא יתחיל ב:\n${nextBroadcastText(next)}`);
+    function setConfig(raw) {
+      cfg = mergeConfig(raw);
+      applyDesign();
+      if (redirectAt === null) tick();
+    }
+
+    // ---------- תצוגה מקדימה מהפאנל ----------
+    window.addEventListener("message", e => {
+      if (!PREVIEW || !e.data || e.data.type !== "kr-preview") return;
+      forcedState = e.data.state || null;
+      previousState = e.data.state === "live" ? null : previousState;
+      setConfig(e.data.config);
+    });
+
+    // ---------- טעינה ----------
+    async function init() {
+      // 1. מהמטמון (טעינה מיידית)
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached && !PREVIEW) cfg = mergeConfig(JSON.parse(cached));
+      } catch (e) {}
+
+      // 2. שעון מדויק
+      const timePromise = (async () => {
+        const useServer = cfg ? cfg.advanced.useServerTime : true;
+        if (useServer && !PREVIEW) offset = (await getServerTime()) - Date.now();
+      })();
+
+      // 3. מסד הנתונים (מתעדכן בזמן אמת)
+      let gotRemote = false;
+      const fallback = setTimeout(() => { if (!gotRemote && !cfg) setConfig(DEFAULT_CONFIG); }, 6000);
+      if (!PREVIEW) {
+        try {
+          const { db, SDK } = await import("../firebase/config.js");
+          const { doc, onSnapshot } = await import(`${SDK}/firebase-firestore.js`);
+          onSnapshot(doc(db, "sites", SITE_ID), snap => {
+            gotRemote = true; clearTimeout(fallback);
+            const data = snap.exists() ? snap.data() : DEFAULT_CONFIG;
+            const { updatedAt, updatedBy, ...clean } = data;
+            try { localStorage.setItem(CACHE_KEY, JSON.stringify(clean)); } catch (e) {}
+            timePromise.then(() => setConfig(clean));
+          }, () => { if (!cfg) setConfig(DEFAULT_CONFIG); });
+        } catch (e) {
+          if (!cfg) setConfig(DEFAULT_CONFIG);
         }
-
-        previousState = state;
+      } else {
+        setConfig(DEFAULT_CONFIG);
+        parent.postMessage({ type: "kr-preview-ready" }, "*");
       }
 
-      tick();
-      // בודקים כל שנייה כדי להעביר אוטומטית כשהשידור מתחיל ולעדכן מצבים
-      setInterval(tick, 1000);
+      await timePromise;
+      if (cfg) { applyDesign(); tick(); }
+      setInterval(() => { tick(); updateCountdown(); }, 1000);
     }
 
     init();

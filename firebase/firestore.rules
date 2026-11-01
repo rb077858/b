@@ -1,0 +1,26 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'rb077858@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    // הגדרות ציבוריות של כל פרויקט במאגר (קריאה לכולם, כתיבה לאדמין בלבד)
+    match /sites/{site} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      // היסטוריית גרסאות - אדמין בלבד
+      match /history/{entry} {
+        allow read, write: if isAdmin();
+      }
+    }
+
+    // כל השאר - אדמין בלבד
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
