@@ -83,14 +83,63 @@
       body.watching .pv-foot { padding: 0 14px 14px; }
       body.watching #player .kp { --kp-radius: 0; }
     }
+    /* ---------- המתנה: טעינה חלקה, בלי גלילה, לרוחב, מסך מלא ---------- */
+    body { min-height: 100dvh; }
+    body:not(.watching) { height: 100dvh; overflow: hidden; }
+    body.booting #card { visibility: hidden; }
+    body.booting::after { content: ""; position: fixed; top: 50%; left: 50%; width: 30px; height: 30px; margin: -15px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--text) 15%, transparent); border-top-color: var(--accent); animation: spin .9s linear infinite .4s; opacity: 0; animation-fill-mode: both; }
+    @keyframes spinIn { to { opacity: 1 } }
+    body.booting::after { animation: spinIn .01s .5s forwards, spin .9s linear infinite; }
+    .card { max-height: calc(100dvh - 32px); }
+    .countdown { font-size: clamp(1.7rem, 7vw, 2.6rem); }
+    .pv { animation: fade .5s ease both; }
+    .fs-btn {
+      position: fixed; top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left)); z-index: 6;
+      width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer; display: grid; place-items: center;
+      background: color-mix(in srgb, var(--text) 12%, transparent); color: var(--text); transition: background .2s, opacity .2s;
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    }
+    .fs-btn:hover { background: color-mix(in srgb, var(--text) 22%, transparent); }
+    .fs-btn svg { width: 22px; height: 22px; fill: currentColor; }
+    body.watching .fs-btn { display: none; }
+    body.fs .countdown { font-size: clamp(2.2rem, 9vmin, 5rem); }
+    body.fs .card { max-width: min(calc(var(--card-w) * 1.25), 94vw); }
+    /* מסך מלא בזמן שידור: הנגן ממלא את כל המסך */
+    body.fs.watching { padding: 0; align-items: stretch; }
+    body.fs .pv { max-width: none; height: 100dvh; display: flex; flex-direction: column; }
+    body.fs .pv-head, body.fs .pv-foot { display: none; }
+    body.fs #player { flex: 1; min-height: 0; }
+    body.fs #player .kp { height: 100%; aspect-ratio: auto; --kp-radius: 0; box-shadow: none; }
+    /* מסכים נמוכים */
+    @media (max-height: 700px) {
+      .card { padding: 26px 24px; }
+      .logo { width: min(var(--logo), 12vh); height: min(var(--logo), 12vh); margin-bottom: 10px; }
+    }
+    /* טלפון לרוחב: טקסט מצד אחד, טיימר גדול מהצד השני */
+    @media (orientation: landscape) and (max-height: 560px) {
+      body:not(.watching) { padding: 10px max(16px, env(safe-area-inset-left)); }
+      .card { max-width: min(860px, 94vw); padding: 18px 28px; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 32px; align-items: center; text-align: start; }
+      .card > * { grid-column: 1; }
+      .card .countdown { grid-column: 2; grid-row: 1 / span 8; margin: 0; text-align: center; font-size: clamp(2rem, 13vh, 4.2rem); }
+      .card .logo { margin: 0 0 6px; }
+      .card .spinner { margin: 0 0 8px; }
+      h1 { font-size: min(var(--title), 9vh); margin-bottom: 6px; }
+      p { font-size: min(1.05rem, 4.8vh); line-height: 1.45; }
+      .name { font-size: min(1.15rem, 5.2vh); }
+      .badge { margin-top: 6px; }
+      .actions { justify-content: flex-start; margin-top: 10px; }
+      .btn { padding: 8px 18px; }
+      .footer { margin-top: 8px; }
+    }
     .preview-tag { position: fixed; top: 10px; left: 10px; z-index: 5; background: #000a; color: #fff; font: 12px sans-serif; padding: 4px 10px; border-radius: 6px; }
   </style>
   <style id="customCss"></style>
 </head>
-<body class="gradient">
+<body class="gradient booting">
+  <button id="fsBtn" class="fs-btn hidden" aria-label="מסך מלא" title="מסך מלא"><svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z"/></svg></button>
   <div id="bgImage"></div>
 
-  <div class="card shadow anim-rise" id="card">
+  <div class="card shadow" id="card">
     <img class="logo" alt="">
     <div id="spinner" class="spinner"></div>
     <h1 id="title">טוען...</h1>
@@ -126,7 +175,7 @@
     import {
       DEFAULT_CONFIG, mergeConfig, getStatus, getServerTime, formatCountdown, windowDateText, SITE_ID,
       lastEnded, windowKey, pad2
-    } from "./schedule.js?v=20261101c";
+    } from "./schedule.js?v=20261101d";
 
     const $ = id => document.getElementById(id);
     const params = new URLSearchParams(location.search);
@@ -171,8 +220,11 @@
       card.classList.toggle("shadow", !!d.shadow);
       $("pv").classList.toggle("shadow", !!d.shadow);
       card.classList.toggle("glass", !!d.glass);
-      card.classList.remove("anim-fade", "anim-rise", "anim-zoom");
-      if (d.animation && d.animation !== "none") card.classList.add("anim-" + d.animation);
+      card.dataset.anim = d.animation || "none";
+      if (!document.body.classList.contains("booting")) {
+        card.classList.remove("anim-fade", "anim-rise", "anim-zoom");
+        if (d.animation && d.animation !== "none") card.classList.add("anim-" + d.animation);
+      }
       $("customCss").textContent = d.customCss || "";
       if (!playing) document.title = cfg.texts.pageTitle || "שידור חי";
       const f = $("footer");
@@ -253,7 +305,7 @@
       document.body.classList.add("watching");
       renderPlayerHead();
 
-      const { Player } = await import("./player.js?v=20261101c");
+      const { Player } = await import("./player.js?v=20261101d");
       if (!playing || playing.key !== key) return;
       player = new Player($("player"), {
         cfg: p, texts: cfg.texts, fallbackUrl: cfg.defaults.liveUrl,
@@ -328,7 +380,10 @@
           else if (playing.kind === "channel" && state === "live" && !next.forced && !finished.has(windowKey(next))) { startPlayer(next, "live"); return; }
           else { renderPlayerHead(); return; }
         }
-        if (state === "live" && !finished.has(windowKey(next))) { startPlayer(next, "live"); return; }
+        if (state === "live" && !finished.has(windowKey(next))) {
+          if (!timeReady && !next.forced) { show({ title: t.loading || "טוען...", loading: true }); return; }
+          startPlayer(next, "live"); return;
+        }
       }
 
       const replay = embed() ? replayCandidate(ms) : null;
@@ -390,41 +445,96 @@
     });
 
     // ---------- טעינה ----------
+    // ---------- מסך מלא (גם בהמתנה, והשידור ממשיך בו כשהוא מתחיל) ----------
+    const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+    const fsOk = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+    let waitLock = null;
+    async function toggleFs() {
+      try {
+        if (fsEl()) { await (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+        const el = document.documentElement;
+        await (el.requestFullscreen ? el.requestFullscreen({ navigationUI: "hide" }) : el.webkitRequestFullscreen());
+        screen.orientation?.lock?.("landscape").catch(() => {});
+      } catch (e) {}
+    }
+    async function onFsChange() {
+      const on = !!fsEl();
+      document.body.classList.toggle("fs", on);
+      $("fsBtn").innerHTML = on
+        ? '<svg viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5zm3-8H5v2h5V5H8zm6 11h2v-3h3v-2h-5zm2-11V5h-2v5h5V8z"/></svg>'
+        : '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z"/></svg>';
+      $("fsBtn").title = on ? "יציאה ממסך מלא" : "מסך מלא";
+      // בזמן המתנה במסך מלא - המסך לא נכבה
+      try {
+        if (on && "wakeLock" in navigator && !waitLock) { waitLock = await navigator.wakeLock.request("screen"); waitLock.addEventListener("release", () => { waitLock = null; }); }
+        if (!on && waitLock) { waitLock.release(); waitLock = null; }
+      } catch (e) {}
+    }
+    if (fsOk) {
+      $("fsBtn").classList.remove("hidden");
+      $("fsBtn").onclick = toggleFs;
+      document.addEventListener("fullscreenchange", onFsChange);
+      document.addEventListener("webkitfullscreenchange", onFsChange);
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && fsEl()) onFsChange(); });
+    }
+
+    // ---------- טעינה חלקה ----------
+    let timeReady = PREVIEW;
+    let revealed = false;
+    function reveal() {
+      if (revealed || !cfg) return;
+      revealed = true;
+      const go = () => {
+        document.body.classList.remove("booting");
+        const card = $("card"), a = card.dataset.anim;
+        if (a && a !== "none") card.classList.add("anim-" + a);
+      };
+      // מחכים רגע לגופן כדי שהטקסט לא "יקפוץ"
+      Promise.race([document.fonts?.ready || Promise.resolve(), new Promise(r => setTimeout(r, 700))]).then(go);
+    }
+
     async function init() {
       try {
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached && !PREVIEW) cfg = mergeConfig(JSON.parse(cached));
       } catch (e) {}
 
-      const timePromise = (async () => {
-        const useServer = cfg ? cfg.advanced.useServerTime : true;
-        if (useServer && !PREVIEW) offset = (await getServerTime()) - Date.now();
-      })();
+      // מציגים מיד (מהמטמון) - בלי לחכות לשעון או למסד הנתונים
+      if (cfg) { applyDesign(); tick(); reveal(); }
+
+      // שעון מדויק ברקע
+      if (!PREVIEW && (cfg ? cfg.advanced.useServerTime !== false : true)) {
+        const done = () => { if (!timeReady) { timeReady = true; tick(); } };
+        getServerTime().then(t => { offset = t - Date.now(); timeReady = false; done(); }).catch(done);
+        setTimeout(done, 4000);
+      } else timeReady = true;
 
       let gotRemote = false;
-      const fallback = setTimeout(() => { if (!gotRemote && !cfg) setConfig(DEFAULT_CONFIG); }, 6000);
+      const fallback = setTimeout(() => { if (!gotRemote && !cfg) setConfig(DEFAULT_CONFIG); reveal(); }, 5000);
+      setTimeout(() => { if (!cfg) return; reveal(); }, 1500);
       if (!PREVIEW) {
         try {
-          const { db, SDK } = await import("../firebase/config.js?v=20261101c");
+          const { db, SDK } = await import("../firebase/config.js?v=20261101d");
           const { doc, onSnapshot } = await import(`${SDK}/firebase-firestore.js`);
           onSnapshot(doc(db, "sites", SITE_ID), snap => {
             gotRemote = true; clearTimeout(fallback);
             const data = snap.exists() ? snap.data() : DEFAULT_CONFIG;
             const { updatedAt, updatedBy, ...clean } = data;
             try { localStorage.setItem(CACHE_KEY, JSON.stringify(clean)); } catch (e) {}
-            timePromise.then(() => setConfig(clean));
-          }, () => { if (!cfg) setConfig(DEFAULT_CONFIG); });
+            setConfig(clean); reveal();
+          }, () => { if (!cfg) setConfig(DEFAULT_CONFIG); reveal(); });
         } catch (e) {
           if (!cfg) setConfig(DEFAULT_CONFIG);
+          reveal();
         }
       } else {
-        setConfig(DEFAULT_CONFIG);
+        setConfig(DEFAULT_CONFIG); reveal();
         parent.postMessage({ type: "kr-preview-ready" }, "*");
       }
 
-      await timePromise;
-      if (cfg) { applyDesign(); tick(); }
-      setInterval(() => { tick(); updateCountdown(); }, 1000);
+      // שעון שמתעדכן בדיוק בתחילת כל שנייה (ספירה לאחור חלקה)
+      const loop = () => { tick(); updateCountdown(); setTimeout(loop, 1000 - (now() % 1000) + 15); };
+      loop();
     }
 
     init();
