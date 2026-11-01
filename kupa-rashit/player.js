@@ -259,12 +259,17 @@ export class Player {
       }
       lastTap = now;
       tapTimer = setTimeout(() => {
-        if (touch) { this.el.box.classList.contains("idle") ? this.poke() : this.el.box.classList.add("idle"); }
+        if (touch) { wasIdle ? this.poke() : this.hideControls(); }
         else this.toggle();
       }, 260);
     });
-    this.el.box.addEventListener("mousemove", () => this.poke());
-    this.el.box.addEventListener("touchstart", () => this.poke(), { passive: true });
+    // זוכרים אם הכפתורים היו מוסתרים *לפני* הנגיעה, כדי שהקשה תציג אותם ולא תסתיר מיד
+    let wasIdle = false;
+    this.el.box.addEventListener("pointerdown", e => {
+      wasIdle = this.el.box.classList.contains("idle");
+      if (e.pointerType !== "mouse" && e.target.closest(".kp-bar,.kp-menu,.kp-banner,button")) this.poke();
+    }, true);
+    this.el.box.addEventListener("pointermove", e => { if (e.pointerType === "mouse") this.poke(); });
     this.el.box.addEventListener("keydown", e => this.onKey(e));
     document.addEventListener("fullscreenchange", () => this.syncUi());
     document.addEventListener("webkitfullscreenchange", () => this.syncUi());
@@ -625,9 +630,14 @@ export class Player {
   poke() {
     this.el.box.classList.remove("idle");
     clearTimeout(this.idleT);
+    const touch = matchMedia("(pointer:coarse)").matches;
     this.idleT = setTimeout(() => {
       if (!this.el.video.paused && this.el.menu.classList.contains("hide") && !this.dragging) this.el.box.classList.add("idle");
-    }, 3000);
+    }, touch ? 4500 : 3000);
+  }
+  hideControls() {
+    clearTimeout(this.idleT);
+    if (!this.el.video.paused && this.el.menu.classList.contains("hide")) this.el.box.classList.add("idle");
   }
 
   toast(msg) {
