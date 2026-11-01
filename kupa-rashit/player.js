@@ -1,13 +1,12 @@
 // =====================================================================
 //  נגן השידור החי של "קופה ראשית" (HLS)
 //  • השהיה אוטומטית: כל מכשיר מזהה כמה הוא נתקע ומגדיל/מקטין את ההשהיה בעצמו
-//  • חזרה אחורה (DVR), "מתחילת התוכנית", שמירת מיקום והמשך צפייה
+//  • חזרה אחורה (DVR) ו"מתחילת התוכנית"
 //  • איכות, מהירות, תמונה-בתוך-תמונה, מסך מלא, מקשי קיצור, נתונים טכניים
 // =====================================================================
 
 const HLS_URL = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
 const PREFS_KEY = "kr-player-prefs";
-const POS_KEY = "kr-player-pos";
 const DELAY_KEY = "kr-auto-delay";
 const MAX_DVR_MS = 8 * 3600e3;
 
@@ -127,7 +126,7 @@ export class Player {
     this.root = root;
     this.o = opts;
     this.cfg = opts.cfg;
-    this.prefs = Object.assign({ quality: null, speed: 1, volume: 1, muted: false, savePos: true, stats: false, delayMode: null, delay: null }, store.get(PREFS_KEY, {}));
+    this.prefs = Object.assign({ quality: null, speed: 1, volume: 1, muted: false, stats: false, delayMode: null, delay: null }, store.get(PREFS_KEY, {}));
     this.hls = null;
     this.offset = null;     // pos = absSec + offset
     this.following = true; // צמוד לשידור החי
@@ -226,7 +225,7 @@ export class Player {
 
     // אירועי וידאו
     v.addEventListener("play", () => this.syncUi());
-    v.addEventListener("pause", () => { this.syncUi(); this.releaseWake(); this.savePos(); });
+    v.addEventListener("pause", () => { this.syncUi(); this.releaseWake(); });
     v.addEventListener("playing", () => {
       this.el.spin.classList.add("hide"); this.el.big.classList.add("hide");
       if (this.stallStart) { const d = Date.now() - this.stallStart; this.stallStart = 0; if (d > 400) this.onStall(d); }
@@ -276,8 +275,7 @@ export class Player {
 
     this.setupSeek();
     this.timers.push(setInterval(() => this.everySecond(), 1000));
-    this.timers.push(setInterval(() => this.savePos(), 5000));
-    addEventListener("pagehide", () => this.savePos());
+    try { localStorage.removeItem("kr-player-pos"); } catch (e) {}  // ניקוי מגרסה קודמת
     this.poke();
   }
 
@@ -395,19 +393,8 @@ export class Player {
     const p = this.p, v = this.el.video, now = Date.now();
     const win = p.win;
 
-    // המשך מאיפה שעצרו
-    let target = null, resumeAsk = null;
-    const saved = store.get(POS_KEY, null);
-    const rmode = this.cfg.resume || "ask";
-    if (rmode !== "off" && this.prefs.savePos && saved && win && saved.key === win.key && !saved.live && now - saved.at < 12 * 3600e3 && this.offset != null) {
-      const pos = this.posOf(saved.abs);
-      if (pos != null && pos > s + 1 && pos < e - this.delay - 15) {
-        if (rmode === "auto") { target = pos; this.toast(`ממשיכים מ-${clock(saved.abs).slice(0, 5)}`); }
-        else resumeAsk = saved.abs;
-      }
-    }
-
-    if (target == null) {
+    let target = null;
+    {
       if (typeof p.startAt === "number" && this.offset != null) target = this.posOf(p.startAt);
       else if (p.startAt === "start" && win && this.offset != null) target = this.posOf(win.start);
     }
@@ -424,10 +411,7 @@ export class Player {
       const startPos = this.posOf(win.start);
       if (startPos > s + 1) this.el.restart.classList.remove("hide");
       const sinceMin = (now - win.start) / 60000;
-      if (resumeAsk) {
-        this.banner(`<b>להמשיך מאיפה שעצרתם (${clock(resumeAsk).slice(0, 5)})?</b>`,
-          [["המשך", () => this.seekAbs(resumeAsk), true], ["לשידור החי", () => this.goLive()]]);
-      } else if (p.startAt === "ask" && sinceMin > 2 && startPos > s + 1 && !p.replay) {
+      if (p.startAt === "ask" && sinceMin > 2 && startPos > s + 1 && !p.replay) {
         this.banner(`<b>התוכנית התחילה לפני ${Math.round(sinceMin)} דקות</b>`,
           [["מההתחלה", () => this.fromStart(), true], ["המשך בשידור החי", () => {}]]);
       }
@@ -554,19 +538,10 @@ export class Player {
     const abs = this.absOf(this.el.video.currentTime);
     if (this.p?.endAt && abs != null && abs >= this.p.endAt) {
       this.el.video.pause();
-      this.savePos(true);
       this.o.onEnd?.();
       return;
     }
     this.syncUi(true);
-  }
-
-  savePos(clear) {
-    if (!this.p?.win || this.offset == null || !this.played) return;
-    if (!this.prefs.savePos || clear) { store.set(POS_KEY, null); return; }
-    const abs = this.absOf(this.el.video.currentTime);
-    if (abs == null) return;
-    store.set(POS_KEY, { key: this.p.win.key, abs, at: Date.now(), live: this.following });
   }
 
   // ---------- ממשק ----------
@@ -700,7 +675,6 @@ export class Player {
       h += this.hls ? `<button class="mi" data-m="quality"><span>איכות</span><span>${this.qualityLabel()} ‹</span></button>` : "";
       h += `<button class="mi" data-m="speed"><span>מהירות</span><span>${this.prefs.speed === 1 ? "רגילה" : this.prefs.speed + "x"} ‹</span></button>`;
       if (this.cfg.viewerDelay) h += `<button class="mi" data-m="delay"><span>השהיה מהשידור</span><span>${this.mode === "auto" ? "אוטומטית" : "קבועה"} · ${this.delay} שנ׳ ‹</span></button>`;
-      h += `<button class="mi" data-t="savePos"><span>שמירת מיקום צפייה</span>${sw(this.prefs.savePos)}</button>`;
       if (this.cfg.showStatsOption !== false) h += `<button class="mi" data-t="stats"><span>נתונים טכניים</span>${sw(this.prefs.stats)}</button>`;
       if (this.p?.win && !this.el.restart.classList.contains("hide")) h += `<button class="mi" data-x="restart"><span>⏮ מתחילת התוכנית</span><span></span></button>`;
       h += `<button class="mi" data-x="live"><span>● לשידור החי</span><span></span></button>`;
@@ -730,7 +704,6 @@ export class Player {
       const b = e.target.closest("button"); if (!b) return;
       const d = b.dataset;
       if (d.m) return this.renderMenu(d.m);
-      if (d.t === "savePos") { this.prefs.savePos = !this.prefs.savePos; if (!this.prefs.savePos) store.set(POS_KEY, null); }
       if (d.t === "stats") { this.prefs.stats = !this.prefs.stats; this.el.stats.classList.toggle("hide", !this.prefs.stats); this.renderStats(); }
       if (d.q) { this.prefs.quality = d.q; this.applyQuality(); }
       if (d.s) { this.prefs.speed = +d.s; this.el.video.playbackRate = +d.s; if (+d.s > 1 && this.following && this.latency() < this.delay + 8) { this.toast("אתם כבר בשידור החי"); } }
@@ -783,7 +756,6 @@ export class Player {
 
   destroyHls() { if (this.hls) { this.hls.destroy(); this.hls = null; } }
   destroy() {
-    this.savePos();
     this.destroyHls();
     this.timers.forEach(clearInterval);
     this.releaseWake();
