@@ -743,7 +743,7 @@ export class Player {
     if (page === "main") {
       h += this.hls ? `<button class="mi" data-m="quality"><span>איכות</span><span>${this.qualityLabel()} ‹</span></button>` : "";
       h += `<button class="mi" data-m="speed"><span>מהירות</span><span>${this.prefs.speed === 1 ? "רגילה" : this.prefs.speed + "x"} ‹</span></button>`;
-      if (this.cfg.viewerDelay) h += `<button class="mi" data-m="delay"><span>השהיה מהשידור</span><span>${this.mode === "auto" ? "אוטומטית" : "קבועה"} · ${this.delay} שנ׳ ‹</span></button>`;
+      if (this.cfg.viewerDelay && !this.p?.replay) h += `<button class="mi" data-m="delay"><span>השהיה מהשידור</span><span>${this.mode === "auto" ? "אוטומטית" : "קבועה"} · ${this.delay} שנ׳ ‹</span></button>`;
       if (this.cfg.showStatsOption !== false) h += `<button class="mi" data-t="stats"><span>נתונים טכניים</span>${sw(this.prefs.stats)}</button>`;
       if (this.p?.win && !this.el.restart.classList.contains("hide")) h += `<button class="mi" data-x="restart"><span>⏮ מתחילת התוכנית</span><span></span></button>`;
       if (!this.p?.replay) h += `<button class="mi" data-x="live"><span>● לשידור החי</span><span></span></button>`;
