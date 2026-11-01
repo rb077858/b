@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>שידור חי - כאן</title>
+
+  <!-- ====================================================================
+       ⚙️  הגדרות - זה המקום היחיד שצריך לערוך. אין צורך לגעת בשאר הקוד.
+       ====================================================================
+
+       איך זה עובד:
+       הדף בודק מה השעה בישראל. כשמגיעה שעת שידור הוא מעביר אוטומטית
+       לקישור של אותו שידור. לפני כן הוא מציג "השידור עוד לא התחיל" ומתי השידור הבא.
+
+       כללים כלליים:
+       • שעות כותבים בפורמט "HH:MM" בשעון 24 שעות, למשל "21:30".
+       • שעת הסיום חייבת להיות אחרי שעת ההתחלה, באותו יום.
+       • תאריכים כותבים בפורמט "YYYY-MM-DD", למשל "2026-12-25".
+       • כל שורה מופרדת בפסיק בסופה, ושימו לב לא למחוק גרשיים או סוגריים.
+       • אם משאירים שדה "name" או "url" ריקים, נלקחים ערכי ברירת המחדל שלמטה.
+       ==================================================================== -->
+  <script>
+    // ---------- 1. ברירות מחדל ----------
+    const DEFAULT_SHOW_NAME = "קופה ראשית";               // שם התוכנית כשלא הוגדר שם אחר
+    const DEFAULT_LIVE_URL  = "https://www.kan.org.il/live/"; // לאן להעביר כשלא הוגדר קישור אחר
+
+    // ---------- 2. שעות קבועות (חוזרות כל שבוע) ----------
+    // day: 0=ראשון, 1=שני, 2=שלישי, 3=רביעי, 4=חמישי, 5=שישי, 6=שבת
+    //
+    // להוסיף שעה קבועה: להעתיק שורה אחת ולשנות את הערכים.
+    // למחוק שעה קבועה: למחוק את כל השורה שלה (או להפוך אותה להערה עם // בתחילתה).
+    // לשנות שעה: לשנות את start / end בשורה.
+    // אפשר גם להוסיף לשורה  url: "קישור אחר"  או  name: "שם אחר"  רק לשעה הזו.
+    //
+    // דוגמה לשורה עם קישור ושם משלה:
+    //   { day: 3, start: "20:00", end: "21:00", name: "תוכנית אחרת", url: "https://example.com" },
+    const WEEKLY_SCHEDULE = [
+      { day: 0, start: "21:30", end: "22:00" },   // כל יום ראשון 21:30-22:00
+    ];
+
+    // ---------- 3. תאריכים מיוחדים (חד-פעמיים) ----------
+    // כל שורה היא שידור אחד בתאריך מסוים, בנוסף לשעות הקבועות.
+    // שדות אופציונליים: name (שם), url (קישור), label (הערה שמוצגת למשתמש).
+    // למחוק: למחוק את השורה. שידורים שהתאריך שלהם עבר פשוט לא מוצגים יותר.
+    //
+    // דוגמה מלאה:
+    //   { date: "2026-12-25", start: "20:00", end: "21:30",
+    //     name: "ערב חג", url: "https://www.kan.org.il/live/", label: "שידור חגיגי" },
+    const SPECIAL_BROADCASTS = [
+      { date: "2026-10-27", start: "21:30", end: "22:00", label: "פרק מיוחד לכבוד יום הבחירות" },
+    ];
+
+    // ---------- 4. ביטול שידור קבוע בתאריך מסוים ----------
+    // אם בשבוע מסוים אין שידור (חג, למשל), רשמו כאן את התאריך.
+    // רק השעות הקבועות מתבטלות; תאריך מיוחד מסעיף 3 באותו יום עדיין יפעל.
+    const CANCELLED_DATES = [
+      // "2026-12-13",
+    ];
+
+    // ---------- 5. מתקדם (בדרך כלל לא צריך לגעת) ----------
+    const JOIN_DELAY_MS  = 3000;   // כמה זמן להציג הודעה לפני העברה כשנכנסים באמצע שידור
+    const START_DELAY_MS = 5000;   // כמה זמן להציג הודעה לפני העברה כשהשידור מתחיל בזמן שהדף פתוח
+  </script>
+  <!-- ======================= סוף ההגדרות ======================= -->
+
+  <style>
+    :root {
+      --bg: #0f1724;
+      --card: #1b2638;
+      --text: #f2f5fa;
+      --muted: #9aa8bd;
+      --accent: #3fa9f5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+      padding: 16px;
+    }
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 40px 32px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+    h1 { margin: 0 0 12px; font-size: 2rem; }
+    p { margin: 0; color: var(--muted); font-size: 1.05rem; line-height: 1.6; white-space: pre-line; }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      margin: 0 auto 16px;
+      border: 4px solid rgba(255, 255, 255, 0.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="spinner" class="spinner"></div>
+    <h1 id="title">טוען...</h1>
+    <p id="subtitle"></p>
+  </div>
+
+  <script>
+    // ===== מכאן והלאה זה הקוד שמריץ את הדף. ההגדרות נמצאות בראש הקובץ. =====
+    const TZ = "Asia/Jerusalem";
+    const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+    const titleEl = document.getElementById("title");
+    const subtitleEl = document.getElementById("subtitle");
+    const spinnerEl = document.getElementById("spinner");
+
+    // ---------- זמן ישראל (כולל מעבר בין שעון קיץ לחורף) ----------
+    const WEEKDAYS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const israelFmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: TZ,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+      weekday: "short",
+      hourCycle: "h23"
+    });
+
+    function israelParts(ms) {
+      const p = {};
+      for (const part of israelFmt.formatToParts(new Date(ms))) p[part.type] = part.value;
+      return {
+        y: +p.year, m: +p.month, d: +p.day,
+        h: +p.hour, mi: +p.minute, s: +p.second,
+        wd: WEEKDAYS[p.weekday]
+      };
+    }
+
+    function tzOffsetMs(ms) {
+      const p = israelParts(ms);
+      return Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s) - Math.floor(ms / 1000) * 1000;
+    }
+
+    // שעה מקומית בישראל -> זמן אבסולוטי
+    function israelToEpoch(y, mo, d, h, mi, s) {
+      const guess = Date.UTC(y, mo - 1, d, h, mi, s);
+      let t = guess - tzOffsetMs(guess);
+      t = guess - tzOffsetMs(t);
+      return t;
+    }
+
+    // ---------- זמן מדויק משרת חיצוני ----------
+    async function fetchWithTimeout(url, options = {}, ms = 5000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ms);
+      try {
+        return await fetch(url, { ...options, signal: controller.signal, cache: "no-store" });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    // מחזיר את הזמן הנוכחי (במילישניות) לפי שרת זמן חיצוני
+    async function getServerTime() {
+      const sources = [
+        async () => {
+          const res = await fetchWithTimeout("https://worldtimeapi.org/api/timezone/Asia/Jerusalem");
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          return data.unixtime * 1000;
+        },
+        async () => {
+          const res = await fetchWithTimeout("https://timeapi.io/api/time/current/zone?timeZone=Asia%2FJerusalem");
+          if (!res.ok) throw new Error();
+          const data = await res.json();
+          // dateTime מוחזר כשעה מקומית בישראל ללא אזור זמן
+          const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(data.dateTime);
+          if (!m) throw new Error();
+          return israelToEpoch(+m[1], +m[2], +m[3], +m[4], +m[5], +m[6]);
+        },
+        async () => {
+          // גיבוי: כותרת Date מהשרת שמארח את הדף
+          const res = await fetchWithTimeout(location.href, { method: "HEAD" });
+          const t = Date.parse(res.headers.get("Date"));
+          if (isNaN(t)) throw new Error();
+          return t;
+        }
+      ];
+
+      for (const source of sources) {
+        try {
+          return await source();
+        } catch (e) {
+          // ננסה את המקור הבא
+        }
+      }
+      // גיבוי אחרון: שעון המכשיר
+      return Date.now();
+    }
+
+    // ---------- לוגיקת השידור ----------
+    function hm(str) { const [h, m] = str.split(":").map(Number); return [h, m]; }
+    const pad2 = n => String(n).padStart(2, "0");
+
+    // כל חלונות השידור (קבועים + מיוחדים) בטווח של כמה ימים סביב רגע נתון, בזמן אבסולוטי
+    function buildWindows(ms) {
+      const p = israelParts(ms);
+      const windows = [];
+
+      function add(y, mo, d, startStr, endStr, name, url, label) {
+        const [sh, sm] = hm(startStr), [eh, em] = hm(endStr);
+        windows.push({
+          y, mo, d,
+          wd: new Date(Date.UTC(y, mo - 1, d)).getUTCDay(),
+          name: name || DEFAULT_SHOW_NAME,
+          url: url || DEFAULT_LIVE_URL,
+          label: label || "",
+          start: israelToEpoch(y, mo, d, sh, sm, 0),
+          end: israelToEpoch(y, mo, d, eh, em, 0),
+          startText: startStr
+        });
+      }
+
+      // שעות קבועות
+      for (let i = -1; i <= 14; i++) {
+        const day = new Date(Date.UTC(p.y, p.m - 1, p.d + i));
+        const y = day.getUTCFullYear(), mo = day.getUTCMonth() + 1, d = day.getUTCDate();
+        if (CANCELLED_DATES.includes(`${y}-${pad2(mo)}-${pad2(d)}`)) continue;
+        for (const w of WEEKLY_SCHEDULE) {
+          if (w.day !== day.getUTCDay()) continue;
+          add(y, mo, d, w.start, w.end, w.name, w.url, w.label);
+        }
+      }
+
+      // תאריכים מיוחדים
+      for (const sp of SPECIAL_BROADCASTS) {
+        const [y, mo, d] = sp.date.split("-").map(Number);
+        add(y, mo, d, sp.start, sp.end, sp.name, sp.url, sp.label);
+      }
+
+      return windows.sort((a, b) => a.start - b.start);
+    }
+
+    // מחזיר: before (לפני השידור הקרוב), live (השידור רץ), ended (השידור הסתיים היום)
+    // ובנוסף את פרטי השידור הרלוונטי (הנוכחי, או הבא)
+    function getStatus(ms) {
+      const windows = buildWindows(ms);
+      const today = israelParts(ms);
+      const current = windows.find(w => ms >= w.start && ms < w.end);
+      const upcoming = windows.find(w => w.start > ms);
+
+      if (current) return { state: "live", next: current };
+      const endedToday = windows.some(w =>
+        ms >= w.end && w.y === today.y && w.mo === today.m && w.d === today.d);
+      return { state: endedToday ? "ended" : "before", next: upcoming };
+    }
+
+    function nextBroadcastText(w) {
+      const lines = [`${w.name}`, `יום ${DAY_NAMES[w.wd]}, ${pad2(w.d)}/${pad2(w.mo)}/${w.y}`, `בשעה ${w.startText}`];
+      if (w.label) lines.push(w.label);
+      return lines.join("\n");
+    }
+
+    function show(title, subtitle, loading = false) {
+      titleEl.textContent = title;
+      subtitleEl.textContent = subtitle || "";
+      spinnerEl.classList.toggle("hidden", !loading);
+    }
+
+    async function init() {
+      const serverNow = await getServerTime();
+      // הפרש בין שעון השרת לשעון המכשיר, כדי להמשיך לספור בלי לפנות שוב ל-API
+      const offset = serverNow - Date.now();
+      const now = () => Date.now() + offset;
+
+      let previousState = null;   // המצב בבדיקה הקודמת
+      let redirectAt = null;      // מתי להעביר לשידור (זמן מכשיר)
+      let redirectMessage = "";
+
+      function tick() {
+        // כבר בתהליך הפניה - מעדכנים רק את הספירה לאחור
+        if (redirectAt !== null) {
+          const secondsLeft = Math.max(1, Math.ceil((redirectAt - Date.now()) / 1000));
+          const unit = secondsLeft === 1 ? "שנייה" : `${secondsLeft} שניות`;
+          subtitleEl.textContent = `${redirectMessage}\nמעביר אותך בעוד ${unit}...`;
+          return;
+        }
+
+        const { state, next } = getStatus(now());
+
+        if (state === "live") {
+          if (previousState === null) {
+            // נכנס כשהשידור כבר רץ
+            redirectMessage = "השידור כבר התחיל, צפייה מהנה";
+            redirectAt = Date.now() + JOIN_DELAY_MS;
+            show("השידור כבר התחיל!", "", true);
+          } else {
+            // חיכה בדף עד שהשידור התחיל
+            redirectMessage = "צפייה מהנה";
+            redirectAt = Date.now() + START_DELAY_MS;
+            show("השידור מתחיל עכשיו!", "", true);
+          }
+          const target = redirectAt;
+          const url = next.url;
+          setTimeout(() => { location.href = url; }, target - Date.now());
+          tick();
+        } else if (!next) {
+          show("אין שידורים קרובים", "כרגע לא מתוכנן שידור. כדאי לבדוק שוב בקרוב.");
+        } else if (state === "ended") {
+          show("השידור הסתיים", `השידור הבא:\n${nextBroadcastText(next)}`);
+        } else {
+          show("השידור עוד לא התחיל", `השידור הבא יתחיל ב:\n${nextBroadcastText(next)}`);
+        }
+
+        previousState = state;
+      }
+
+      tick();
+      // בודקים כל שנייה כדי להעביר אוטומטית כשהשידור מתחיל ולעדכן מצבים
+      setInterval(tick, 1000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
