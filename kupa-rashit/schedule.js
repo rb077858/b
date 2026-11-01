@@ -45,6 +45,28 @@ export const DEFAULT_CONFIG = {
     { id: "s1", enabled: true, date: "2026-10-27", start: "21:30", end: "22:00", name: "", url: "", label: "פרק מיוחד לכבוד יום הבחירות" }
   ],
   cancelled: [],
+  player: {
+    mode: "embed",           // embed = נגן מוטמע בדף | redirect = העברה לאתר חיצוני (defaults.liveUrl)
+    source: "https://n-160-4.cdn.avcom-bezeq.tv/webcache/redge-il/livehls/oil/kancdn-live/live/kan11/live.livx/playlist.m3u8",
+    dvrParam: "dvr",         // פרמטר בשרת שמאפשר חזרה אחורה בזמן (ריק = לא נתמך)
+    dvrMinutes: 30,          // כמה דקות אחורה אפשר לגלול (מעבר לתחילת התוכנית)
+    delayMode: "auto",       // auto = כל מכשיר מתאים לעצמו לפי התקיעות | fixed = השהיה קבועה
+    delay: 12,               // השהיה מהשידור החי (שניות). במצב אוטומטי זו נקודת ההתחלה
+    delayMin: 8,
+    delayMax: 40,
+    viewerDelay: true,       // לאפשר לצופה לשנות השהיה בהגדרות הנגן
+    joinMode: "ask",         // live = ישר לשידור החי | start = מתחילת התוכנית | ask = לשאול
+    resume: "ask",           // auto | ask | off - המשך מאיפה שהצופה עצר
+    afterEnd: "stop",        // stop = לעצור בסוף התוכנית | continue = להמשיך לנגן את הערוץ
+    endGraceMinutes: 2,
+    replayHours: 3,          // צפייה חוזרת אחרי השידור (0 = כבוי)
+    alwaysOn: false,         // לאפשר צפייה בערוץ גם מחוץ לשעות השידור
+    autoplay: true,
+    startMuted: false,
+    defaultQuality: "auto",  // auto | 1080 | 720 | 540 | 360
+    seekStep: 10,
+    showStatsOption: true
+  },
   override: {
     mode: "auto",      // auto = לפי הלוח | live = להעביר עכשיו לשידור | off = להציג הודעה בלבד
     url: "",
@@ -69,6 +91,10 @@ export const DEFAULT_CONFIG = {
     offText: "",
     redirectBtn: "לצפייה בשידור",
     countdownLead: "בעוד",
+    replayBtn: "צפייה חוזרת בפרק",
+    watchNowBtn: "לצפייה בערוץ עכשיו",
+    liveBadge: "שידור חי",
+    fallbackLink: "השידור לא עובד? לצפייה באתר כאן",
     footer: ""
   },
   design: {
@@ -215,6 +241,7 @@ export function buildWindows(cfg, ms) {
       wd: new Date(Date.UTC(y, mo - 1, d)).getUTCDay(),
       name: src.name || cfg.defaults.showName,
       url: src.url || cfg.defaults.liveUrl,
+      stream: src.stream || "",
       label: src.label || "",
       start, end,
       openAt: start - earlyMs,
@@ -263,7 +290,7 @@ export function getStatus(cfg, ms) {
     const o = cfg.override;
     return {
       state: "live", forced: true, windows,
-      next: { name: cfg.defaults.showName, url: o.url || cfg.defaults.liveUrl, label: "", forced: true }
+      next: { name: cfg.defaults.showName, url: o.url || cfg.defaults.liveUrl, stream: /\.m3u8/i.test(o.url || "") ? o.url : "", label: "", forced: true, key: "forced" }
     };
   }
 
@@ -274,6 +301,14 @@ export function getStatus(cfg, ms) {
   const endedToday = windows.some(w => ms >= w.end && w.y === t.y && w.mo === t.m && w.d === t.d);
   return { state: endedToday ? "ended" : "before", next: upcoming, windows };
 }
+
+// השידור האחרון שהסתיים (לצפייה חוזרת)
+export function lastEnded(cfg, ms) {
+  const ws = buildWindows(cfg, ms).filter(w => w.end <= ms);
+  return ws.length ? ws[ws.length - 1] : null;
+}
+
+export const windowKey = w => (w.forced ? "forced" : `${w.date}_${w.startText}`);
 
 export function formatCountdown(msLeft) {
   if (msLeft <= 0) return "";
