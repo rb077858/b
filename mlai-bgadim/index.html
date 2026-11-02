@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#7b2ff7">
+  <title>מלאי בגדים</title>
+  <meta name="description" content="סופרים את הבגדים בארון, רואים לכמה זמן הם יספיקו, ומורידים תמונה צבעונית של המלאי.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E👕%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Rubik:wght@400;500;700;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="blobs" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+
+  <header class="hero">
+    <div class="hero-icons" id="heroIcons" aria-hidden="true"></div>
+    <h1>מלאי <span>הבגדים</span> שלי</h1>
+    <p class="tagline">סופרים מה יש בארון, רואים לכמה זמן זה יספיק, ומקבלים תמונה מעוצבת להורדה</p>
+    <div class="name-field">
+      <label for="ownerName">של מי המלאי?</label>
+      <input id="ownerName" type="text" maxlength="40" placeholder="למשל: יוסי" autocomplete="name">
+    </div>
+  </header>
+
+  <main>
+    <section class="section-head">
+      <h2>מה יש בארון</h2>
+      <p>מדליקים את סוגי הבגדים שיש לך, ומכבים את מה שלא צריך</p>
+    </section>
+
+    <section class="grid" id="grid"></section>
+
+    <section class="notes-card">
+      <div class="notes-title"><span class="notes-emoji">📝</span><h2>הערות כלליות</h2></div>
+      <textarea id="generalNotes" rows="3" maxlength="600" placeholder="למשל: צריך לקנות עוד 2 חולצות לבנות לשבת, הג'ינס הכחול נקרע בברך..."></textarea>
+    </section>
+
+    <div class="reset-row"><button type="button" class="link-btn" id="resetBtn">↺ להתחיל מההתחלה</button></div>
+  </main>
+
+  <footer class="bar">
+    <div class="bar-inner">
+      <div class="bar-stats">
+        <strong id="totalItems">0</strong>
+        <span id="totalText">פריטים</span>
+      </div>
+      <button type="button" class="finish-btn" id="finishBtn">
+        <span>סיימתי! צור תמונה</span><span class="sparkle">✨</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- הוספת סוג בגד -->
+  <dialog class="modal" id="addModal">
+    <form method="dialog" class="modal-box" id="addForm">
+      <button type="button" class="x" data-close aria-label="סגירה">✕</button>
+      <h2>סוג בגד חדש</h2>
+      <div class="add-preview" id="addPreview"></div>
+      <label class="field">
+        <span>שם</span>
+        <input id="addName" type="text" maxlength="24" placeholder="למשל: חולצות שבת" required>
+      </label>
+      <div class="field">
+        <span>איור</span>
+        <div class="icon-pick" id="iconPick"></div>
+      </div>
+      <div class="field">
+        <span>צבע</span>
+        <div class="color-pick" id="colorPick"></div>
+      </div>
+      <button type="submit" class="primary-btn">הוספה ✚</button>
+    </form>
+  </dialog>
+
+  <!-- התמונה המוכנה -->
+  <dialog class="modal" id="resultModal">
+    <div class="modal-box result-box">
+      <button type="button" class="x" data-close aria-label="סגירה">✕</button>
+      <h2>התמונה מוכנה! 🎉</h2>
+      <div class="result-img" id="resultImg"><div class="loader"></div></div>
+      <div class="result-actions">
+        <a class="primary-btn" id="downloadBtn" download="מלאי-בגדים.png">⬇ הורדת התמונה</a>
+        <button type="button" class="ghost-btn" id="shareBtn" hidden>שיתוף</button>
+        <button type="button" class="ghost-btn" data-close>חזרה לעריכה</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="icons.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
