@@ -1,23 +1,22 @@
 /* עובד ברקע: טוען את מודל הזיהוי ומריץ אותו, כדי שהמסך לא ייתקע. */
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm';
-
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-// כשהדף מבודד אפשר לרוץ על כמה ליבות במקביל – פי 3 עד 4 יותר מהר מליבה אחת
-if (self.crossOriginIsolated) {
-  env.backends.onnx.wasm.numThreads = Math.max(1, Math.min(self.navigator.hardwareConcurrency || 4, 6));
-}
-
+let pipeline, env;
 const MODEL = 'Xenova/owlv2-base-patch16-ensemble';
 const DTYPE = 'q8';
-let detector = null, device = null, loading = null, noGpu = false;
+let detector = null, loading = null;
 
-async function gpuOk() {
-  if (noGpu) return false;
-  try { return !!(self.navigator.gpu && await self.navigator.gpu.requestAdapter()); } catch (e) { return false; }
-}
+function post(m) { self.postMessage(m); }
+self.addEventListener('unhandledrejection', (e) => {
+  post({ type: 'fatal', message: String((e.reason && e.reason.message) || e.reason || 'שגיאה') });
+});
 
-function load(id) {
+const libReady = import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/+esm').then((m) => {
+  pipeline = m.pipeline; env = m.env;
+  env.allowLocalModels = false;
+  env.useBrowserCache = true;
+  post({ type: 'hello' });
+}).catch((e) => { post({ type: 'fatal', message: 'לא הצלחנו לטעון את ספריית הזיהוי: ' + (e && e.message) }); });
+
+function load(id, safe) {
   if (detector) return Promise.resolve();
   if (loading) return loading;
   const files = {};
@@ -26,48 +25,34 @@ function load(id) {
       files[p.file] = [p.loaded, p.total];
       let l = 0, t = 0;
       Object.values(files).forEach(([a, b]) => { l += a; t += b; });
-      self.postMessage({ type: 'progress', id, loaded: l, total: t });
+      post({ type: 'progress', id, loaded: l, total: t });
+    } else if (p.status === 'ready' || p.status === 'done') {
+      post({ type: 'progress', id, stage: p.status });
     }
   };
   loading = (async () => {
-    if (await gpuOk()) {
-      try {
-        detector = await pipeline('zero-shot-object-detection', MODEL, { dtype: DTYPE, device: 'webgpu', progress_callback });
-        device = 'webgpu'; return;
-      } catch (e) { noGpu = true; self.postMessage({ type: 'nogpu' }); }
-    }
+    await libReady;
+    // כשהדף מבודד אפשר לרוץ על כמה ליבות במקביל. במצב בטוח – ליבה אחת.
+    const cores = self.navigator.hardwareConcurrency || 4;
+    env.backends.onnx.wasm.numThreads = (!safe && self.crossOriginIsolated) ? Math.max(1, Math.min(cores, 6)) : 1;
     detector = await pipeline('zero-shot-object-detection', MODEL, { dtype: DTYPE, device: 'wasm', progress_callback });
-    device = 'wasm';
   })();
   loading.catch(() => { loading = null; });
   return loading;
 }
 
-async function detect(url, labels) {
-  try {
-    return await detector(url, labels, { threshold: 0.08 });
-  } catch (e) {
-    if (device !== 'webgpu') throw e;
-    noGpu = true; detector = null; loading = null;
-    self.postMessage({ type: 'nogpu' });
-    await load();
-    return await detector(url, labels, { threshold: 0.08 });
-  }
-}
-
 self.onmessage = async (e) => {
   const m = e.data;
   try {
-    if (m.noGpu) noGpu = true;
     if (m.type === 'load') {
-      await load(m.id);
-      self.postMessage({ type: 'done', id: m.id, device, threads: env.backends.onnx.wasm.numThreads, isolated: self.crossOriginIsolated });
+      await load(m.id, m.safe);
+      post({ type: 'done', id: m.id, threads: env.backends.onnx.wasm.numThreads, isolated: self.crossOriginIsolated });
     } else if (m.type === 'detect') {
-      await load(m.id);
-      const r = await detect(m.url, m.labels);
-      self.postMessage({ type: 'done', id: m.id, result: r.map((d) => ({ label: d.label, score: d.score, box: d.box })) });
+      await load(m.id, m.safe);
+      const r = await detector(m.url, m.labels, { threshold: 0.05 });
+      post({ type: 'done', id: m.id, result: r.map((d) => ({ label: d.label, score: d.score, box: d.box })) });
     }
   } catch (err) {
-    self.postMessage({ type: 'error', id: m.id, message: String((err && err.message) || err) });
+    post({ type: 'error', id: m.id, message: String((err && err.message) || err) });
   }
 };
