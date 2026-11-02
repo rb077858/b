@@ -2,6 +2,8 @@
   'use strict';
 
   var STORE_KEY = 'mlai-bgadim-v1';
+  // גרסת הקבצים – להעלות בכל שינוי (וגם ב-index.html), כדי שהדפדפן לא יציג גרסה ישנה מהמטמון
+  var ASSET_V = '5';
   var COLORS = ['#4f8ef7', '#ff6b6b', '#9b6dff', '#4cc9f0', '#ff9f1c', '#06d6a0', '#f15bb5', '#ffbe0b',
     '#2a9d8f', '#e63946', '#3a0ca3', '#80b918', '#b5651d', '#4a4e69'];
   var UNITS = { d: ['יום', 'יומיים', 'ימים', 1], w: ['שבוע', 'שבועיים', 'שבועות', 7], m: ['חודש', 'חודשיים', 'חודשים', 30], y: ['שנה', 'שנתיים', 'שנים', 365] };
@@ -550,7 +552,7 @@
     }
     if (scanner) { scanner.open(); return; }
     btn.classList.add('loading');
-    import('./scan.js').then(function (m) {
+    import('./scan.js?v=' + ASSET_V).then(function (m) {
       scanner = m.setup(scanApi); scanner.open();
     }).catch(function (e) {
       console.error(e); alert('לא הצלחנו לטעון את הזיהוי. צריך חיבור לאינטרנט בפעם הראשונה.');

@@ -10,7 +10,9 @@ self.addEventListener('fetch', (e) => {
   if (r.method !== 'GET') return;
   if (r.cache === 'only-if-cached' && r.mode !== 'same-origin') return;
   if (new URL(r.url).origin !== self.location.origin) return; // משאבים חיצוניים כבר שולחים CORS/CORP
-  e.respondWith(fetch(r).then((res) => {
+  // תמיד בודקים מול השרת אם יש גרסה חדשה (בלי להציג קבצים ישנים מהמטמון)
+  const fresh = r.mode === 'navigate' ? fetch(r.url, { cache: 'no-cache', credentials: 'same-origin' }) : fetch(r, { cache: 'no-cache' });
+  e.respondWith(fresh.then((res) => {
     if (res.status === 0 || res.type === 'opaqueredirect') return res;
     const h = new Headers(res.headers);
     h.set('Cross-Origin-Opener-Policy', 'same-origin');
