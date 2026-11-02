@@ -507,8 +507,39 @@
     }
   }
 
+  /* ---------- זיהוי מתמונה (נטען רק כשצריך) ---------- */
+  var scanner = null;
+  var scanApi = {
+    items: function () { return state.items; },
+    find: findItem,
+    esc: esc,
+    icon: iconSvg,
+    applyCounts: function (t, mode) {
+      var changed = [];
+      state.items.forEach(function (it) {
+        if (!(it.id in t)) return;
+        it.count = Math.min(999, (mode === 'add' ? (+it.count || 0) : 0) + t[it.id]);
+        it.on = true; changed.push(it.id);
+      });
+      render(); save();
+      changed.forEach(function (id) { var el = cardEl(id); if (el) el.animate([{ boxShadow: '0 0 0 6px var(--c)' }, { boxShadow: '0 0 0 0 transparent' }], { duration: 1400 }); });
+      var first = changed.length && cardEl(changed[0]); if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+  function openScan() {
+    var btn = $('scanBtn');
+    if (scanner) { scanner.open(); return; }
+    btn.classList.add('loading');
+    import('./scan.js').then(function (m) {
+      scanner = m.setup(scanApi); scanner.open();
+    }).catch(function (e) {
+      console.error(e); alert('לא הצלחנו לטעון את הזיהוי. צריך חיבור לאינטרנט בפעם הראשונה.');
+    }).then(function () { btn.classList.remove('loading'); });
+  }
+
   /* ---------- הפעלה ---------- */
   function init() {
+    $('scanBtn').addEventListener('click', openScan);
     heroIcons();
     $('ownerName').value = state.owner || '';
     $('generalNotes').value = state.notes || '';
