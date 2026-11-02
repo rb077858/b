@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d1a16">
+<title>דף · עורך דף גמרא</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231d1a16'/%3E%3Ctext x='32' y='46' font-size='38' text-anchor='middle' fill='%23d9b46a' font-family='serif' font-weight='700'%3E%D7%93%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="appbar">
+  <div class="brand">
+    <span class="logo">ד</span>
+    <div class="brand-txt"><b>דף</b><small>עורך דף גמרא</small></div>
+  </div>
+  <nav class="tabs" id="tabs" aria-label="עמודים"></nav>
+  <div class="actions">
+    <button class="btn icon" id="undoBtn" title="ביטול (Ctrl+Z)" aria-label="ביטול">
+      <svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <button class="btn icon" id="redoBtn" title="חזרה (Ctrl+Y)" aria-label="חזרה">
+      <svg viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+    </button>
+    <button class="btn icon" id="designBtn" title="עיצוב ופונטים" aria-label="עיצוב">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+    <button class="btn icon" id="menuBtn" title="עוד" aria-label="עוד">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/></svg>
+    </button>
+    <button class="btn primary" id="downloadBtn">
+      <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+      <span>הורדת תמונה</span>
+    </button>
+  </div>
+</header>
+
+<div class="hint" id="hint">
+  <span>✍️ לחצו על כל מילה בדף כדי לערוך אותה · לחיצה על הכותרת או על מספר הדף עורכת אותם</span>
+  <button class="x" id="hintClose" aria-label="סגירה">×</button>
+</div>
+
+<main id="stage" class="stage">
+  <div id="pages" class="pages"></div>
+</main>
+
+<div class="zoom">
+  <button class="btn icon" id="zoomOut" aria-label="הקטנה">−</button>
+  <button class="btn ghost" id="zoomFit" title="התאמה למסך">התאם</button>
+  <button class="btn icon" id="zoomIn" aria-label="הגדלה">+</button>
+</div>
+
+<!-- Quick word editor -->
+<div class="quick" id="quick" hidden>
+  <div class="quick-top">
+    <span class="chip" id="quickWhere"></span>
+    <span class="ctx" id="quickCtx"></span>
+    <button class="x" id="quickClose" aria-label="סגירה">×</button>
+  </div>
+  <div class="quick-row">
+    <input id="quickInput" type="text" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+    <button class="btn primary" id="quickOk" title="שמירה">✓</button>
+  </div>
+  <div class="quick-row tools">
+    <button class="btn ghost" id="quickBold"><b>מודגש</b></button>
+    <button class="btn ghost" id="quickPrev" title="המילה הקודמת">→ הקודמת</button>
+    <button class="btn ghost" id="quickNext" title="המילה הבאה">הבאה ←</button>
+    <button class="btn ghost danger" id="quickDel">מחיקה</button>
+    <button class="btn ghost" id="quickFull">עריכת כל הקטע</button>
+  </div>
+</div>
+
+<!-- Sheet (bottom on mobile, side panel on desktop) -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="sheet" id="sheet" hidden aria-modal="true" role="dialog">
+  <div class="sheet-grip"></div>
+  <div class="sheet-head">
+    <h2 id="sheetTitle"></h2>
+    <button class="btn primary sm" id="sheetDone">סיום</button>
+  </div>
+  <div class="sheet-body" id="sheetBody"></div>
+</aside>
+
+<div class="menu" id="menu" hidden>
+  <button data-act="addPage">➕ הוספת עמוד חדש</button>
+  <button data-act="dupPage">📄 שכפול העמוד הנוכחי</button>
+  <button data-act="delPage">🗑️ מחיקת העמוד הנוכחי</button>
+  <hr>
+  <button data-act="downloadAll">🖼️ הורדת כל העמודים כתמונה אחת</button>
+  <button data-act="share">📤 שיתוף תמונה</button>
+  <button data-act="print">🖨️ הדפסה / PDF</button>
+  <hr>
+  <button data-act="export">💾 שמירת קובץ עבודה (JSON)</button>
+  <button data-act="import">📂 פתיחת קובץ עבודה</button>
+  <button data-act="reset">↺ איפוס לדפים המקוריים</button>
+  <button data-act="help">❔ איך עורכים?</button>
+</div>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+<input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2,font/*" hidden>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="busy" id="busy" hidden><div class="spinner"></div><span id="busyTxt">מכין תמונה…</span></div>
+
+<script src="lib/html-to-image.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
