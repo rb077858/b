@@ -128,7 +128,7 @@
           <label class="pick-btn"><input type="file" accept="image/*" capture="environment" id="camInput" hidden><span>📷</span>צילום עכשיו</label>
           <label class="pick-btn alt"><input type="file" accept="image/*" multiple id="galInput" hidden><span>🖼️</span>מהגלריה</label>
         </div>
-        <p class="scan-small center">מזהה את סוגי הבגדים שדלוקים ברשימה (סוגים שהוספתם בעצמכם צריך לספור ידנית).</p>
+        <p class="scan-small center">מזהה את סוגי הבגדים שדלוקים ברשימה, ותמיד גם כובעים וציציות. סוגים שהוספתם בעצמכם צריך לספור ידנית.</p>
       </div>
 
       <div data-view="busy" class="scan-view" hidden>
@@ -138,7 +138,7 @@
       </div>
 
       <div data-view="review" class="scan-view" hidden>
-        <p class="scan-small center">לחיצה על מסגרת מבטלת אותה (ושוב, מחזירה). ב־± אפשר לתקן.</p>
+        <p class="scan-small center">טעות? לוחצים על מסגרת כדי לשנות את הסוג או למחוק. פריט שפוספס (למשל ציצית או כובע)? לוחצים עליו בתמונה ומוסיפים.</p>
         <div class="stage" id="scanStage"></div>
         <div class="thumbs" id="scanThumbs"></div>
         <label class="thr"><span>פחות</span><input type="range" id="scanThr" min="4" max="26" value="16" aria-label="רגישות הזיהוי"><span>יותר</span></label>
@@ -149,6 +149,16 @@
           <label><input type="radio" name="scanMode" value="add"> להוסיף לקיים</label>
         </div>
         <button type="button" class="primary-btn" id="scanApply">✔ עדכון המלאי</button>
+        <div class="fix-sheet" id="fixSheet" hidden>
+          <div class="fix-box">
+            <h3 id="fixTitle">מה זה?</h3>
+            <div class="fix-opts" id="fixOpts"></div>
+            <div class="fix-actions">
+              <button type="button" class="ghost-btn" id="fixDel">🚫 זה לא בגד</button>
+              <button type="button" class="ghost-btn" id="fixCancel">ביטול</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div data-view="error" class="scan-view" hidden>
