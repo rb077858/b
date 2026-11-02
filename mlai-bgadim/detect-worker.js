@@ -3,6 +3,10 @@ import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transfo
 
 env.allowLocalModels = false;
 env.useBrowserCache = true;
+// כשהדף מבודד אפשר לרוץ על כמה ליבות במקביל – פי 3 עד 4 יותר מהר מליבה אחת
+if (self.crossOriginIsolated) {
+  env.backends.onnx.wasm.numThreads = Math.max(1, Math.min(self.navigator.hardwareConcurrency || 4, 6));
+}
 
 const MODEL = 'Xenova/owlv2-base-patch16-ensemble';
 const DTYPE = 'q8';
@@ -57,7 +61,7 @@ self.onmessage = async (e) => {
     if (m.noGpu) noGpu = true;
     if (m.type === 'load') {
       await load(m.id);
-      self.postMessage({ type: 'done', id: m.id, device });
+      self.postMessage({ type: 'done', id: m.id, device, threads: env.backends.onnx.wasm.numThreads, isolated: self.crossOriginIsolated });
     } else if (m.type === 'detect') {
       await load(m.id);
       const r = await detect(m.url, m.labels);

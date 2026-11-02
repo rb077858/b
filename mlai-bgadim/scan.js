@@ -63,7 +63,7 @@ function call(msg, onProgress) {
   });
 }
 export function loadModel(onProgress) {
-  return call({ type: 'load' }, onProgress).then((m) => { ready = true; return m; });
+  return call({ type: 'load' }, onProgress).then((m) => { ready = true; console.info('זיהוי:', m.device, 'ליבות:', m.threads, 'מבודד:', m.isolated); return m; });
 }
 function runDetect(url, labels, onProgress) {
   return call({ type: 'detect', url, labels }, onProgress).then((m) => m.result);

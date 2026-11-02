@@ -508,7 +508,12 @@
   }
 
   /* ---------- זיהוי מתמונה (נטען רק כשצריך) ---------- */
-  var scanner = null;
+  var scanner = null, coiReady = false;
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register('coi-sw.js').then(function () {
+      return navigator.serviceWorker.ready;
+    }).then(function () { coiReady = true; }).catch(function () { /* בלי service worker – עובד, רק לאט יותר */ });
+  }
   var scanApi = {
     items: function () { return state.items; },
     find: findItem,
@@ -528,6 +533,21 @@
   };
   function openScan() {
     var btn = $('scanBtn');
+    // בפעם הראשונה הדף עוד לא מבודד: טוענים אותו מחדש פעם אחת כדי שהזיהוי ירוץ על כל הליבות
+    if (!window.crossOriginIsolated && coiReady) {
+      var tried = false;
+      try { tried = !!sessionStorage.getItem('mlai-coi-tried'); } catch (e) { /* */ }
+      if (!tried) {
+        try {
+          sessionStorage.setItem('mlai-coi-tried', '1');
+          sessionStorage.setItem('mlai-open-scan', '1');
+          localStorage.setItem(STORE_KEY, JSON.stringify(state));
+          btn.classList.add('loading');
+          location.reload();
+          return;
+        } catch (e) { /* ממשיכים בלי */ }
+      }
+    }
     if (scanner) { scanner.open(); return; }
     btn.classList.add('loading');
     import('./scan.js').then(function (m) {
@@ -540,6 +560,9 @@
   /* ---------- הפעלה ---------- */
   function init() {
     $('scanBtn').addEventListener('click', openScan);
+    try {
+      if (sessionStorage.getItem('mlai-open-scan')) { sessionStorage.removeItem('mlai-open-scan'); setTimeout(openScan, 300); }
+    } catch (e) { /* */ }
     heroIcons();
     $('ownerName').value = state.owner || '';
     $('generalNotes').value = state.notes || '';
