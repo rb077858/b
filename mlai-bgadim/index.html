@@ -26,6 +26,14 @@
   </header>
 
   <main>
+    <section class="scan-cta">
+      <button type="button" class="scan-btn" id="scanBtn">
+        <span class="scan-ic">📸</span>
+        <span class="scan-txt"><b>ספירה אוטומטית מתמונה</b><small>מצלמים את הארון, והבגדים נספרים לבד</small></span>
+        <span class="scan-arrow">←</span>
+      </button>
+    </section>
+
     <section class="section-head">
       <h2>מה יש בארון</h2>
       <p>מדליקים את סוגי הבגדים שיש לך, ומכבים את מה שלא צריך</p>
@@ -85,6 +93,67 @@
         <a class="primary-btn" id="downloadBtn" download="מלאי-בגדים.png">⬇ הורדת התמונה</a>
         <button type="button" class="ghost-btn" id="shareBtn" hidden>שיתוף</button>
         <button type="button" class="ghost-btn" data-close>חזרה לעריכה</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- זיהוי מתמונה -->
+  <dialog class="modal scan-modal" id="scanModal">
+    <div class="modal-box">
+      <button type="button" class="x" data-close aria-label="סגירה">✕</button>
+      <h2>ספירה מתמונה 📸</h2>
+
+      <div data-view="intro" class="scan-view">
+        <div class="scan-hero">🤖👕👖🧦</div>
+        <p class="scan-p">הזיהוי רץ <b>על הטלפון שלך</b>: בלי שרת, בחינם, והתמונות לא נשלחות לשום מקום.</p>
+        <p class="scan-p">בפעם הראשונה צריך להוריד את מודל הזיהוי, <b>כ־155MB</b> (עדיף ב־WiFi). הוא נשמר במכשיר, ומהפעם הבאה הזיהוי יעבוד מיד, גם בלי אינטרנט.</p>
+        <button type="button" class="primary-btn" id="dlBtn">⬇ הורדת מודל הזיהוי</button>
+      </div>
+
+      <div data-view="download" class="scan-view" hidden>
+        <p class="scan-p center">מורידים את מודל הזיהוי...</p>
+        <div class="dl-track"><div class="dl-bar" id="dlBar"></div></div>
+        <p class="scan-small center" id="dlText">מתחילים...</p>
+        <p class="scan-small center">אפשר להשאיר את החלון פתוח. זה קורה רק פעם אחת.</p>
+      </div>
+
+      <div data-view="pick" class="scan-view" hidden>
+        <div class="tips">
+          <b>💡 לתוצאה הכי טובה:</b>
+          <span>מצלמים כל מדף או מוט בנפרד, עם אור טוב</span>
+          <span>רואים כל פריט, ולא ערימה צפופה מדי</span>
+          <span>אפשר להוסיף כמה תמונות, והכמויות יתחברו</span>
+        </div>
+        <div class="pick-row">
+          <label class="pick-btn"><input type="file" accept="image/*" capture="environment" id="camInput" hidden><span>📷</span>צילום עכשיו</label>
+          <label class="pick-btn alt"><input type="file" accept="image/*" multiple id="galInput" hidden><span>🖼️</span>מהגלריה</label>
+        </div>
+        <p class="scan-small center">מזהה את סוגי הבגדים שדלוקים ברשימה (סוגים שהוספתם בעצמכם צריך לספור ידנית).</p>
+      </div>
+
+      <div data-view="busy" class="scan-view" hidden>
+        <div class="busy-img"><img id="scanBusyImg" alt=""><div class="scanline"></div></div>
+        <p class="scan-p center" id="scanBusyText">מזהים בגדים...</p>
+        <p class="scan-small center"><span id="scanTimer">0 שניות</span> · בטלפון זה יכול לקחת עד דקה</p>
+      </div>
+
+      <div data-view="review" class="scan-view" hidden>
+        <p class="scan-small center">לחיצה על מסגרת מבטלת אותה (ושוב, מחזירה). ב־± אפשר לתקן.</p>
+        <div class="stage" id="scanStage"></div>
+        <div class="thumbs" id="scanThumbs"></div>
+        <label class="thr"><span>פחות</span><input type="range" id="scanThr" min="4" max="26" value="16" aria-label="רגישות הזיהוי"><span>יותר</span></label>
+        <div class="summary" id="scanSummary"></div>
+        <label class="pick-btn more"><input type="file" accept="image/*" multiple id="moreInput" hidden>➕ עוד תמונה <small id="scanCount"></small></label>
+        <div class="mode-row">
+          <label><input type="radio" name="scanMode" value="replace" checked> להחליף את הכמויות</label>
+          <label><input type="radio" name="scanMode" value="add"> להוסיף לקיים</label>
+        </div>
+        <button type="button" class="primary-btn" id="scanApply">✔ עדכון המלאי</button>
+      </div>
+
+      <div data-view="error" class="scan-view" hidden>
+        <p class="scan-p center">😕 <span id="scanErr"></span></p>
+        <button type="button" class="ghost-btn" id="retryBtn">לנסות שוב</button>
       </div>
     </div>
   </dialog>
