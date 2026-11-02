@@ -51,7 +51,7 @@ function killWorker() {
 function getWorker() {
   if (worker) return worker;
   try {
-    worker = new Worker(new URL('./detect-worker.js', import.meta.url), { type: 'module' });
+    worker = new Worker(new URL('./detect-worker.js?v=' + (new URL(import.meta.url).searchParams.get('v') || '0'), import.meta.url), { type: 'module' });
   } catch (e) {
     worker = null;
     throw new Error('הדפדפן הזה לא תומך בזיהוי. נסו לעדכן אותו, או לפתוח ב־Chrome או ב־Safari.');
