@@ -102,14 +102,30 @@ export async function claimsFor(pid) {
   return mapDocs(await getDocs(query(col("rm_claims"), where("pid", "==", pid))));
 }
 
-// מחשב מחדש את התשובות המחושבות של אדם ושומר אותן על מסמך האדם
-export async function recomputePerson(pid) {
+// מחשב מחדש את התשובות המחושבות של אדם ושומר אותן על מסמך האדם.
+// כמה משתמשים יכולים לענות על אותו אדם בו זמנית: כל אחד שומר טענה משלו (מסמך נפרד),
+// אבל החישוב נכתב למסמך אחד. כדי שחישוב שקרא לפני שחבר שמר לא ידרוס את התשובה שלו,
+// אחרי הכתיבה קוראים שוב, ואם בינתיים נוספה או השתנתה טענה או הכרעה - מחשבים שוב.
+// מי ששמר אחרי הקריאה החוזרת מחשב בעצמו אחרי זה, כך שהכתיבה האחרונה תמיד כוללת הכל.
+const fpOf = (cs, rs) => [...cs.docs, ...rs.docs]
+  .map(d => { const x = d.data(); return `${d.ref.parent.id}/${d.id}:${x.v}:${x.t}:${x.ignored ? 1 : 0}:${x.pid}`; })
+  .sort().join("|");
+async function readPerson(pid) {
   const [cs, rs] = await Promise.all([
     getDocs(query(col("rm_claims"), where("pid", "==", pid))),
     getDocs(query(col("rm_resolved"), where("pid", "==", pid)))
   ]);
-  const res = computeEff(cs.docs.map(d => d.data()), rs.docs.map(d => d.data()));
-  await updateDoc(personRef(pid), { eff: res.eff, conf: res.conf, n: res.n, effAt: Date.now() });
+  return { cs, rs, fp: fpOf(cs, rs) };
+}
+export async function recomputePerson(pid) {
+  let cur = await readPerson(pid), res;
+  for (let i = 0; i < 5; i++) {
+    res = computeEff(cur.cs.docs.map(d => d.data()), cur.rs.docs.map(d => d.data()));
+    await updateDoc(personRef(pid), { eff: res.eff, conf: res.conf, n: res.n, effAt: Date.now() });
+    const next = await readPerson(pid);
+    if (next.fp === cur.fp) break;
+    cur = next;
+  }
   return res;
 }
 
