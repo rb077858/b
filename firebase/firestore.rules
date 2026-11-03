@@ -18,6 +18,111 @@ service cloud.firestore {
       }
     }
 
+    // =================================================================
+    //  שותפים לחדר (bchira) - אוספים שמתחילים ב-rm_
+    // =================================================================
+    function signedIn() {
+      return request.auth != null;
+    }
+    function myUserPath() {
+      return /databases/$(database)/documents/rm_users/$(request.auth.uid);
+    }
+    function myUser() {
+      return get(myUserPath()).data;
+    }
+    // משתמש פעיל: אדמין, או מי שנרשם ואינו חסום
+    function active() {
+      return isAdmin()
+        || (signedIn() && exists(myUserPath()) && myUser().get('blocked', false) != true);
+    }
+    function validQid(q) {
+      return q in ['sleep', 'wake', 'tidy', 'noise', 'temp', 'study', 'guests', 'food', 'night', 'share'];
+    }
+
+    // הגדרה ציבורית: האם ההרשמה פתוחה
+    match /rm_public/{d} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // קוד ההזמנה - רק אדמין קורא וכותב. החוקים בודקים אותו בעצמם בזמן הרשמה
+    match /rm_secret/{d} {
+      allow read, write: if isAdmin();
+    }
+
+    // משתמשים (חשבון Google). כל משתמש רואה רק את עצמו
+    match /rm_users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAdmin()
+        || (signedIn()
+            && request.auth.uid == uid
+            && request.resource.data.email == request.auth.token.email
+            && request.resource.data.blocked == false
+            && request.resource.data.first is string
+            && request.resource.data.first.size() >= 1 && request.resource.data.first.size() <= 30
+            && request.resource.data.last is string
+            && request.resource.data.last.size() >= 1 && request.resource.data.last.size() <= 30
+            && request.resource.data.pid is string
+            && request.resource.data.picks is list && request.resource.data.picks.size() == 0
+            && get(/databases/$(database)/documents/rm_public/config).data.open == true
+            && request.resource.data.code == get(/databases/$(database)/documents/rm_secret/invite).data.code);
+      // המשתמש יכול לעדכן רק רשימת בחירות ומשקלים. חסימה ושם רק אדמין
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == uid && active()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['picks', 'w', 'lastSeen'])
+            && request.resource.data.picks.size() <= 5);
+      allow delete: if isAdmin();
+    }
+
+    // אנשים בשכבה (גם כאלה שעוד לא נכנסו). eff/conf/n הם התשובות המחושבות
+    match /rm_people/{pid} {
+      allow read: if active();
+      allow create: if active()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.merged == false
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 62;
+      allow update: if isAdmin()
+        || (active()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['eff', 'conf', 'n', 'effAt']));
+      allow delete: if isAdmin();
+    }
+
+    // טענות: מי ענה מה על מי. מזהה המסמך = pid_qid_uid
+    match /rm_claims/{cid} {
+      allow read: if active();
+      allow create: if active()
+        && request.resource.data.author == request.auth.uid
+        && request.resource.data.pid is string
+        && validQid(request.resource.data.qid)
+        && cid == request.resource.data.pid + '_' + request.resource.data.qid + '_' + request.auth.uid
+        && request.resource.data.v is int
+        && request.resource.data.v >= 0 && request.resource.data.v <= 3
+        && request.resource.data.t is number
+        && request.resource.data.self is bool
+        && (request.resource.data.self == false || myUser().pid == request.resource.data.pid)
+        && request.resource.data.get('ignored', false) == false;
+      allow update: if isAdmin()
+        || (active()
+            && resource.data.author == request.auth.uid
+            && request.resource.data.author == request.auth.uid
+            && request.resource.data.pid == resource.data.pid
+            && request.resource.data.qid == resource.data.qid
+            && request.resource.data.v is int
+            && request.resource.data.v >= 0 && request.resource.data.v <= 3
+            && request.resource.data.t is number
+            && request.resource.data.self is bool
+            && (request.resource.data.self == false || myUser().pid == request.resource.data.pid)
+            && request.resource.data.get('ignored', false) == resource.data.get('ignored', false));
+      allow delete: if isAdmin();
+    }
+
+    // הכרעות אדמין לסתירות ועריכות. אדמין בלבד כותב
+    match /rm_resolved/{rid} {
+      allow read: if active();
+      allow write: if isAdmin();
+    }
+
     // כל השאר - אדמין בלבד
     match /{document=**} {
       allow read, write: if isAdmin();

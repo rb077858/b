@@ -1,0 +1,7 @@
+{
+  "name": "rules-test",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "firebase emulators:exec --only firestore --project demo-rm \"node test.mjs\"" },
+  "devDependencies": { "@firebase/rules-unit-testing": "^3.0.0", "firebase": "^11.0.2", "firebase-tools": "^13.0.0" }
+}
