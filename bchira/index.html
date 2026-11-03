@@ -3,44 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="robots" content="noindex">
+<meta name="robots" content="noindex, nofollow">
 <title>שותפים לחדר</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Secular+One&display=swap">
-<style>html{color-scheme:light}
-/* Layout concept: one centered notice under a construction-tape stripe. Static page, no script, nothing touches stored data. */
-:root{
-  --bg:#E8EDF1;--surface:#F7F9FB;--ink:#16222D;--muted:#586979;--line:#C6D1DB;--warn:#C98A1B;
-  --font-display:'Secular One','Heebo',system-ui,sans-serif;
-  --font-body:'Heebo',system-ui,-apple-system,'Segoe UI',sans-serif;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){--bg:#0F1820;--surface:#17232D;--ink:#E5ECF1;--muted:#93A4B2;--line:#2B3B48;--warn:#E2B35C;color-scheme:dark}
-}
-:root[data-theme="dark"]{--bg:#0F1820;--surface:#17232D;--ink:#E5ECF1;--muted:#93A4B2;--line:#2B3B48;--warn:#E2B35C;color-scheme:dark}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{
-  margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--font-body);
-  display:grid;place-items:center;
-  padding-block:24px;
-  padding-left:max(16px,env(safe-area-inset-left,0px));
-  padding-right:max(16px,env(safe-area-inset-right,0px));
-}
-.card{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:22px 20px}
-.tape{height:14px;border-radius:3px;margin-bottom:20px;background:repeating-linear-gradient(-45deg,var(--warn) 0 14px,var(--ink) 14px 28px)}
-.eyebrow{font-size:12px;letter-spacing:.06em;color:var(--muted);margin:0 0 4px}
-h1{font:400 34px/1.1 var(--font-display);margin:0 0 10px;text-wrap:balance}
-p{margin:0 0 12px}
-.note{margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main class="card" dir="rtl" lang="he">
-  <div class="tape" aria-hidden="true"></div>
-  <p class="eyebrow">שותפים לחדר</p>
-  <h1>האתר בשיפוץ</h1>
-  <p>אנחנו בונים גרסה חדשה: כניסה עם Google, קישור אחד לכל השכבה ודירוג משותף. נחזור בקרוב.</p>
-  <p class="note">אם הזנת נתונים בדפדפן הזה, הם נשארים שמורים ולא נמחקים.</p>
-</main>
+<div id="app"><div class="center"><div class="spin"></div></div></div>
+<script type="module" src="app.js"></script>
 </body>
 </html>
