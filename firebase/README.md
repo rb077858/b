@@ -5,7 +5,8 @@
 | קובץ | תפקיד |
 |---|---|
 | `config.js` | אתחול Firebase. כל דף מייבא ממנו: `import { db } from "../firebase/config.js"` |
-| `firestore.rules` | חוקי אבטחה: קריאה ציבורית ל-`sites/*`, כתיבה רק ל-rb077858@gmail.com |
+| `firestore.rules` | חוקי אבטחה: קריאה ציבורית ל-`sites/*`, כתיבה רק ל-rb077858@gmail.com. כולל גם את האוספים `rm_*` של "שותפים לחדר" (ראו `bchira-next/README.md`) |
+| `rules-test/` | בדיקות לחוקים מול אמולטור |
 
 ## מבנה הנתונים
 - `sites/<שם-תיקייה>` - ההגדרות של כל פרויקט (למשל `sites/kupa-rashit`)
