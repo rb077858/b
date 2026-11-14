@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<title>מונופול – ברקוד קלף מטייל</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#fff;color:#111;
+    font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+  .screen{position:fixed;inset:0;display:none;background:#fff}
+  .screen.on{display:block}
+  /* intro */
+  #intro{padding:max(24px,env(safe-area-inset-top)) 24px 24px;text-align:center}
+  #intro .box{max-width:420px;margin:0 auto;height:100%;display:flex;flex-direction:column;justify-content:center;gap:18px}
+  h1{margin:0;font-size:26px}
+  p{margin:0;font-size:18px;line-height:1.5}
+  .big{font-size:22px;font-weight:700}
+  button{font:inherit;font-size:19px;font-weight:700;border:0;border-radius:14px;padding:15px 22px;background:#111;color:#fff}
+  button.sec{background:#e8e8e8;color:#111}
+  button:active{opacity:.8}
+  /* calibration */
+  #rect{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border:3px solid #e2231a;background:rgba(226,35,26,.06);border-radius:4px}
+  #handle{position:absolute;left:-18px;bottom:-18px;width:36px;height:36px;border-radius:50%;background:#e2231a;border:3px solid #fff;touch-action:none}
+  #calTop{position:absolute;top:0;left:0;right:0;padding:max(14px,env(safe-area-inset-top)) 16px 0;text-align:center;font-size:17px;line-height:1.4;pointer-events:none}
+  #ctrl{position:absolute;left:0;right:0;bottom:0;padding:12px 16px max(14px,env(safe-area-inset-bottom));background:rgba(255,255,255,.94);border-top:1px solid #ddd;display:grid;gap:8px}
+  #ctrl label{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:10px;font-size:16px}
+  #ctrl input[type=range]{width:100%;height:34px}
+  #ctrl .row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+  #ctrl .row label{display:flex;grid-template-columns:none;gap:8px}
+  #ctrl .row button{flex:1}
+  /* show */
+  #show{background:#fff}
+  #bc{position:absolute}
+  #bc svg{display:block;width:100%;height:100%}
+  #back{position:absolute;top:max(10px,env(safe-area-inset-top));right:10px;padding:8px 14px;font-size:15px;opacity:.35}
+  #hint{position:absolute;top:max(54px,calc(env(safe-area-inset-top) + 44px));left:0;right:0;text-align:center;font-size:15px;color:#555;transition:opacity 1s}
+</style>
+</head>
+<body>
+
+<!-- 1: הוראות -->
+<div id="intro" class="screen on">
+  <div class="box">
+    <h1>ברקוד קלף המטייל</h1>
+    <p class="big">שלב 1: בקש/י קלף הפתעה אחר</p>
+    <p>הבא/י קלף הפתעה אמיתי של המונופול (אחד מהמשחק שלך).<br>נתאים את גודל הברקוד לקלף שבידיך.</p>
+    <button id="start">מסך מלא והמשך</button>
+    <p style="font-size:14px;color:#666">כדאי להפוך לאורך ולהעלות את בהירות המסך למקסימום.</p>
+  </div>
+</div>
+
+<!-- 2: כיול -->
+<div id="cal" class="screen">
+  <div id="calTop"><b>שלב 2:</b> הנח/י את הקלף האמיתי על המסך והתאם/י את המלבן האדום בדיוק לגודלו (קנה מידה 1:1).</div>
+  <div id="rect"><div id="handle"></div></div>
+  <div id="ctrl">
+    <label>רוחב <input id="sw" type="range" min="80" max="600" step="0.5"></label>
+    <label>גובה <input id="sh" type="range" min="80" max="900" step="0.5"></label>
+    <div class="row">
+      <label><input id="lock" type="checkbox" checked> נעילת יחס</label>
+      <button id="ok">אישור והצג ברקוד</button>
+    </div>
+  </div>
+</div>
+
+<!-- 3: ברקוד -->
+<div id="show" class="screen">
+  <div id="bc"></div>
+  <div id="hint">יישר/י את הקצה התחתון של הקלף לקצה התחתון של המסך</div>
+  <button id="back" class="sec">חזרה לכיול</button>
+</div>
+
+<script>
+(function(){
+  // מידות הקלף בתמונת המקור (פיקסלים) והברקוד עצמו עליו
+  var CARD={w:975,h:1504};
+  var BC={x:471-55,y:1583-465,w:499,h:331};         // מיקום הברקוד בתוך הקלף
+  var ASPECT=CARD.w/CARD.h;
+  var BARS='<svg viewBox="0 0 499 331" preserveAspectRatio="none" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">'+
+    '<rect x="0" y="0" width="94" height="331" fill="#000"/>'+     // פס L
+    '<rect x="94" y="274" width="61" height="57" fill="#000"/>'+   // רגל ה-L
+    '<rect x="171" y="0" width="95" height="331" fill="#000"/>'+   // פס 2
+    '<rect x="406" y="0" width="93" height="331" fill="#000"/>'+   // פס 3
+    '</svg>';
+
+  var $=function(id){return document.getElementById(id)};
+  var W,H;
+  try{var s=JSON.parse(localStorage.getItem('traveler-size')||'null');if(s&&s.w>50&&s.h>50){W=s.w;H=s.h}}catch(e){}
+  if(!W){W=Math.min(220,innerWidth*0.6);H=W/ASPECT}
+
+  function show(id){['intro','cal','show'].forEach(function(n){$(n).classList.toggle('on',n===id)});
+    if(id==='cal')applyRect(); if(id==='show')drawBarcode();}
+
+  function clamp(){W=Math.max(80,Math.min(W,innerWidth-8));H=Math.max(80,Math.min(H,innerHeight-8))}
+  function applyRect(){
+    clamp();
+    $('rect').style.width=W+'px';$('rect').style.height=H+'px';
+    $('sw').max=Math.floor(innerWidth-8);$('sh').max=Math.floor(innerHeight-8);
+    $('sw').value=W;$('sh').value=H;
+    try{localStorage.setItem('traveler-size',JSON.stringify({w:W,h:H}))}catch(e){}
+  }
+
+  function drawBarcode(){
+    // הקלף צמוד לתחתית המסך, ממורכז אופקית; הברקוד ממוקם יחסית לקלף
+    var sx=W/CARD.w, sy=H/CARD.h;
+    var bc=$('bc');
+    bc.style.width=BC.w*sx+'px';bc.style.height=BC.h*sy+'px';
+    bc.style.left=(innerWidth-W)/2+BC.x*sx+'px';
+    bc.style.top=innerHeight-H+BC.y*sy+'px';
+    bc.innerHTML=BARS;
+    $('hint').style.opacity=1;setTimeout(function(){$('hint').style.opacity=0},4000);
+  }
+
+  // מסך מלא
+  function fs(){var e=document.documentElement;var f=e.requestFullscreen||e.webkitRequestFullscreen;
+    if(f){try{var p=f.call(e);if(p&&p.catch)p.catch(function(){})}catch(x){}}}
+  // מניעת כיבוי מסך
+  var lock=null;
+  function wake(){if('wakeLock' in navigator){navigator.wakeLock.request('screen').then(function(l){lock=l}).catch(function(){})}}
+  document.addEventListener('visibilitychange',function(){if(!document.hidden&&$('show').classList.contains('on'))wake()});
+
+  $('start').onclick=function(){fs();wake();show('cal')};
+  $('ok').onclick=function(){fs();show('show')};
+  $('back').onclick=function(){show('cal')};
+
+  $('sw').oninput=function(){var v=+this.value;if($('lock').checked){H=H*v/W}W=v;applyRect()};
+  $('sh').oninput=function(){var v=+this.value;if($('lock').checked){W=W*v/H}H=v;applyRect()};
+
+  // גרירת הידית (פינה שמאלית-תחתונה; המלבן ממורכז, לכן הגודל = 2× המרחק מהמרכז)
+  var drag=false;
+  $('handle').addEventListener('pointerdown',function(e){drag=true;this.setPointerCapture(e.pointerId);e.preventDefault()});
+  $('handle').addEventListener('pointermove',function(e){
+    if(!drag)return;
+    var nw=2*(innerWidth/2-e.clientX), nh=2*(e.clientY-innerHeight/2);
+    if($('lock').checked){var k=Math.max(nw/W,nh/H);W=W*k;H=H*k}else{W=nw;H=nh}
+    applyRect();
+  });
+  ['pointerup','pointercancel'].forEach(function(t){$('handle').addEventListener(t,function(){drag=false})});
+
+  addEventListener('resize',function(){if($('cal').classList.contains('on'))applyRect();if($('show').classList.contains('on'))drawBarcode()});
+})();
+</script>
+</body>
+</html>
