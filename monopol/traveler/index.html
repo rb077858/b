@@ -36,6 +36,24 @@
   #bc svg{display:block;width:100%;height:100%}
   #back{position:absolute;top:max(10px,env(safe-area-inset-top));right:10px;padding:8px 14px;font-size:15px;opacity:.35}
   #hint{position:absolute;top:max(54px,calc(env(safe-area-inset-top) + 44px));left:0;right:0;text-align:center;font-size:15px;color:#555;transition:opacity 1s}
+  /* print setup */
+  #prt{padding:max(24px,env(safe-area-inset-top)) 24px 24px;text-align:center}
+  #prt .box{max-width:420px;margin:0 auto;height:100%;display:flex;flex-direction:column;justify-content:center;gap:16px}
+  #prt .dims{display:flex;gap:12px;justify-content:center;align-items:center;font-size:18px}
+  #prt input[type=number]{width:90px;font:inherit;font-size:20px;padding:10px;border:2px solid #bbb;border-radius:10px;text-align:center}
+  #sheet{display:none}
+  #back2{opacity:.35}
+  @page{size:A4 portrait;margin:0}
+  @media print{
+    html,body{overflow:visible;height:auto;background:#fff}
+    .screen{display:none!important}
+    #sheet{display:block;position:relative;width:210mm;height:297mm;page-break-after:avoid;overflow:hidden}
+    #sheetCard{position:absolute;border:0.3mm dashed #000;background:#fff}
+    #sheetBc{position:absolute}
+    #sheetBc svg{display:block;width:100%;height:100%}
+    .tick{position:absolute;background:#000}
+    #sheetNote{position:absolute;left:0;right:0;top:8mm;text-align:center;font:10pt Arial,sans-serif;color:#555}
+  }
 </style>
 </head>
 <body>
@@ -70,7 +88,23 @@
   <div id="bc"></div>
   <div id="hint">יישר/י את הקצה התחתון של הקלף לקצה התחתון של המסך</div>
   <button id="back" class="sec">חזרה לכיול</button>
+  <button id="toPrint" class="sec" style="position:absolute;top:max(10px,env(safe-area-inset-top));left:10px;padding:8px 14px;font-size:15px;opacity:.5">הדפס A4</button>
 </div>
+
+<!-- 4: הדפסה -->
+<div id="prt" class="screen">
+  <div class="box">
+    <h1>הדפסה ב-A4</h1>
+    <p>מדוד/י את הקלף האמיתי בסרגל והזן/י את מידותיו במ״מ.<br>(ברירת מחדל: גודל קלף משחק סטנדרטי)</p>
+    <div class="dims"><input id="mmw" type="number" min="20" max="200" step="0.5" value="63"> × <input id="mmh" type="number" min="20" max="280" step="0.5" value="88"> מ״מ</div>
+    <p style="font-size:14px;color:#666">רוחב × גובה. בהדפסה חשוב לבחור "גודל אמיתי" / 100% (בלי "התאם לעמוד").</p>
+    <button id="doPrint">הדפס</button>
+    <button id="back2" class="sec">חזרה</button>
+  </div>
+</div>
+
+<!-- גיליון להדפסה -->
+<div id="sheet"><div id="sheetNote">גזור לאורך הקו המקווקו – גודל 1:1</div><div id="sheetCard"></div><div id="sheetBc"></div></div>
 
 <script>
 (function(){
@@ -90,7 +124,7 @@
   try{var s=JSON.parse(localStorage.getItem('traveler-size')||'null');if(s&&s.w>50&&s.h>50){W=s.w;H=s.h}}catch(e){}
   if(!W){W=Math.min(220,innerWidth*0.6);H=W/ASPECT}
 
-  function show(id){['intro','cal','show'].forEach(function(n){$(n).classList.toggle('on',n===id)});
+  function show(id){['intro','cal','show','prt'].forEach(function(n){$(n).classList.toggle('on',n===id)});
     if(id==='cal')applyRect(); if(id==='show')drawBarcode();}
 
   function clamp(){W=Math.max(80,Math.min(W,innerWidth-8));H=Math.max(80,Math.min(H,innerHeight-8))}
@@ -120,6 +154,31 @@
   var lock=null;
   function wake(){if('wakeLock' in navigator){navigator.wakeLock.request('screen').then(function(l){lock=l}).catch(function(){})}}
   document.addEventListener('visibilitychange',function(){if(!document.hidden&&$('show').classList.contains('on'))wake()});
+
+  function buildSheet(){
+    var w=+$('mmw').value, h=+$('mmh').value;
+    var x0=(210-w)/2, y0=(297-h)/2;
+    var card=$('sheetCard');
+    card.style.cssText='left:'+x0+'mm;top:'+y0+'mm;width:'+w+'mm;height:'+h+'mm';
+    var b=$('sheetBc'), sx=w/CARD.w, sy=h/CARD.h;
+    b.style.cssText='left:'+(x0+BC.x*sx)+'mm;top:'+(y0+BC.y*sy)+'mm;width:'+(BC.w*sx)+'mm;height:'+(BC.h*sy)+'mm';
+    b.innerHTML=BARS;
+    // סימני חיתוך בפינות, מחוץ לקלף
+    Array.prototype.slice.call(document.querySelectorAll('.tick')).forEach(function(t){t.remove()});
+    [[x0,y0],[x0+w,y0],[x0,y0+h],[x0+w,y0+h]].forEach(function(c,i){
+      var dx=i%2?1:-1, dy=i<2?-1:1;
+      var a=document.createElement('div');a.className='tick';
+      a.style.cssText='width:5mm;height:0.2mm;left:'+(dx>0?c[0]+1:c[0]-6)+'mm;top:'+c[1]+'mm';
+      var v=document.createElement('div');v.className='tick';
+      v.style.cssText='width:0.2mm;height:5mm;top:'+(dy>0?c[1]+1:c[1]-6)+'mm;left:'+c[0]+'mm';
+      $('sheet').appendChild(a);$('sheet').appendChild(v);
+    });
+  }
+  $('toPrint').onclick=function(){show('prt')};
+  $('back2').onclick=function(){show('show')};
+  $('doPrint').onclick=function(){buildSheet();window.print()};
+  try{var m=JSON.parse(localStorage.getItem('traveler-mm')||'null');if(m){$('mmw').value=m.w;$('mmh').value=m.h}}catch(e){}
+  ['mmw','mmh'].forEach(function(id){$(id).onchange=function(){try{localStorage.setItem('traveler-mm',JSON.stringify({w:+$('mmw').value,h:+$('mmh').value}))}catch(e){}}});
 
   $('start').onclick=function(){fs();wake();show('cal')};
   $('ok').onclick=function(){fs();show('show')};
