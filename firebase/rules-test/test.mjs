@@ -98,12 +98,13 @@ await no('unverified admin email', setDoc(doc(FAKEADM, 'rm_secret/invite'), { co
 
 console.log('--- ממים');
 const IMG = 'https://storage.googleapis.com/meme-king-storage/memes/israeli/abc.jpg';
-const meme = (o = {}) => ({ imageUrl: IMG, thumbUrl: IMG.replace('/memes/', '/meme-thumbs/'), sourceId: 'abc', category: 'israeli', sourceDesc: 'x', top: 'למעלה', bottom: '', size: 1, name: '', status: 'new', createdAt: serverTimestamp(), ...o });
+const meme = (o = {}) => ({ imageUrl: IMG, thumbUrl: IMG.replace('/memes/', '/meme-thumbs/'), sourceId: 'abc', category: 'israeli', sourceDesc: 'x', top: 'למעלה', bottom: '', size: 1, status: 'new', createdAt: serverTimestamp(), ...o });
 await ok('anon sends meme', addDoc(collection(anon, 'memes'), meme()));
 await no('no text', addDoc(collection(anon, 'memes'), meme({ top: '', bottom: '' })));
 await no('foreign image', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://evil.com/a.jpg' })));
 await no('status downloaded', addDoc(collection(anon, 'memes'), meme({ status: 'downloaded' })));
 await no('extra field', addDoc(collection(anon, 'memes'), meme({ x: 1 })));
+await no('name field', addDoc(collection(anon, 'memes'), meme({ name: 'x' })));
 await no('size too big', addDoc(collection(anon, 'memes'), meme({ size: 5 })));
 await no('fake createdAt', addDoc(collection(anon, 'memes'), meme({ createdAt: 1 })));
 await no('text too long', addDoc(collection(anon, 'memes'), meme({ top: 'א'.repeat(151) })));

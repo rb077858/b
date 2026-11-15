@@ -5,7 +5,7 @@
 // =====================================================================
 import { db } from "../firebase/config.js?v=20261101h";
 import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
-import { CATEGORIES, catName, fetchCategory, loadFonts, loadImage, drawMeme, clampSize, esc } from "./meme.js?v=20261115a";
+import { CATEGORIES, catName, fetchCategory, loadFonts, loadImage, drawMeme, clampSize, esc } from "./meme.js?v=20261115b";
 
 const $ = id => document.getElementById(id);
 const PAGE = 48;
@@ -125,7 +125,6 @@ async function openEditor(m, keepText = false) {
   cur = m; curImg = null;
   const token = ++loadToken;
   if (!keepText) { $("tTop").value = ""; $("tBot").value = ""; $("tSize").value = 100; }
-  $("who").value = store.get("memes-who", "");
   $("edDesc").textContent = m.desc || catName(m.category);
   $("cvLoad").hidden = false;
   cv.style.visibility = "hidden";
@@ -173,8 +172,6 @@ $("edForm").addEventListener("submit", async e => {
   t.bottom = t.bottom.trim().slice(0, 150);
   if (!t.top && !t.bottom) { toast("צריך לכתוב לפחות טקסט אחד ✍️", true); $("tTop").focus(); return; }
   if (!curImg) { toast("התמונה עוד נטענת...", true); return; }
-  const who = $("who").value.trim().slice(0, 40);
-  store.set("memes-who", who);
   sending = true;
   $("send").disabled = true;
   $("send").querySelector("span").textContent = "שולח...";
@@ -188,7 +185,6 @@ $("edForm").addEventListener("submit", async e => {
       top: t.top,
       bottom: t.bottom,
       size: Math.round(t.size * 100) / 100,
-      name: who,
       status: "new",
       createdAt: serverTimestamp()
     });

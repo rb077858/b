@@ -7,7 +7,7 @@
 
 ## נתונים
 אוסף `memes` ב-Firestore. **התמונה עצמה לא נשמרת**, רק הקישור למקור והטקסטים:
-`imageUrl, thumbUrl, sourceId, category, sourceDesc, top, bottom, size, name, status ('new'|'downloaded'), createdAt`.
+`imageUrl, thumbUrl, sourceId, category, sourceDesc, top, bottom, size, status ('new'|'downloaded'), createdAt`.
 כל אחד יכול רק ליצור מם (בפורמט שנבדק בחוקים, ותמונה רק מ-memeking). קריאה, עריכה ומחיקה: אדמין בלבד.
 
 ## הערות
