@@ -4,11 +4,11 @@
 //  צפייה בכל הממים שנשלחו, עריכה, מחיקה והורדה כתמונה.
 // =====================================================================
 import { app, db, SDK, ADMIN_EMAIL } from "../../firebase/config.js?v=20261101h";
-import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc } from "../meme.js?v=20261115d";
+import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc, cleanPos, enableDrag } from "../meme.js?v=20261115e";
 
 const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } =
   await import(`${SDK}/firebase-auth.js`);
-const { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch } =
+const { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch, deleteField } =
   await import(`${SDK}/firebase-firestore.js`);
 
 const $ = id => document.getElementById(id);
@@ -102,7 +102,7 @@ function render() {
   $("list").replaceChildren(frag);
   paintSelection();
 }
-const sig = m => JSON.stringify([m.top, m.bottom, m.size, m.status, m.imageUrl]);
+const sig = m => JSON.stringify([m.top, m.bottom, m.size, m.status, m.imageUrl, m.topPos, m.bottomPos]);
 
 function card(m) {
   const c = document.createElement("button");
@@ -487,9 +487,19 @@ $("aDel").onclick = async () => {
 // ---------------------------------------------------------------------
 //  עריכה
 // ---------------------------------------------------------------------
-const editVals = () => ({ top: $("eTop").value, bottom: $("eBot").value, size: clampSize(+$("eSize").value / 100) });
+const ePos = { top: null, bottom: null };
+const editVals = () => ({ top: $("eTop").value, bottom: $("eBot").value, size: clampSize(+$("eSize").value / 100), topPos: ePos.top, bottomPos: ePos.bottom });
+const redrawEdit = () => { if (vImg) drawMeme($("vCv"), vImg, editVals(), 1400); };
+function setEPos(key, p) {
+  ePos[key] = cleanPos(p);
+  document.querySelector(`#vEdit .reset[data-k="${key}"]`).disabled = !ePos[key];
+  redrawEdit();
+}
+enableDrag($("vCv"), { enabled: () => editing && !!vImg, onMove: setEPos });
+document.querySelectorAll("#vEdit .reset").forEach(b => b.onclick = () => setEPos(b.dataset.k, null));
 function setEditing(on) {
   editing = on;
+  $("vStage").classList.toggle("editing", on);
   $("vView").hidden = on;
   $("vEdit").hidden = !on;
   $("vPrev").hidden = $("vNext").hidden = on;
@@ -501,8 +511,9 @@ $("aEdit").onclick = () => {
   $("eBot").value = m.bottom || "";
   $("eSize").value = Math.round(clampSize(m.size) * 100);
   setEditing(true);
+  setEPos("top", m.topPos); setEPos("bottom", m.bottomPos);
 };
-["eTop", "eBot", "eSize"].forEach(id => $(id).addEventListener("input", () => { if (vImg) drawMeme($("vCv"), vImg, editVals(), 1400); }));
+["eTop", "eBot", "eSize"].forEach(id => $(id).addEventListener("input", redrawEdit));
 $("eCancel").onclick = () => { setEditing(false); showMeme(curId, true); };
 $("vEdit").addEventListener("submit", async e => {
   e.preventDefault();
@@ -512,6 +523,8 @@ $("vEdit").addEventListener("submit", async e => {
       top: v.top.trim().slice(0, 150),
       bottom: v.bottom.trim().slice(0, 150),
       size: Math.round(v.size * 100) / 100,
+      topPos: v.topPos || deleteField(),
+      bottomPos: v.bottomPos || deleteField(),
       editedAt: serverTimestamp()
     });
     setEditing(false);

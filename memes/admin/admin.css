@@ -148,3 +148,7 @@ kbd {
 .khint { text-align: center; margin: 18px 0 14px !important; font-size: 13px; }
 .card:focus-visible { outline: none; border-color: var(--vio); box-shadow: 0 0 0 3px var(--vio); }
 .card.sel:focus-visible { box-shadow: 0 0 0 3px var(--acc), 0 0 0 6px var(--vio); }
+
+/* גרירת טקסט בעריכה */
+.v-stage.editing #vCv { touch-action: none; outline: 2px dashed rgba(255,210,63,.55); outline-offset: 4px; }
+#vCv.dragging { cursor: grabbing !important; }
