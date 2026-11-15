@@ -7,7 +7,7 @@
   <title>קופה ראשית - שידור חי</title>
   <!--
     כל ההגדרות (שעות, נגן, טקסטים, עיצוב) מנוהלות מפאנל הניהול:
-    https://reembir.com/b/admin/
+    https://reembir.com/b/kupa-rashit/admin/
     ונשמרות ב-Firebase (Firestore) במסמך sites/kupa-rashit.
   -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -274,9 +274,20 @@
       cd.appendChild(s); cd.appendChild(document.createTextNode(formatCountdown(to - now())));
     }
 
-    function nextLines(w) {
+    // שם התוכנית בשורה נפרדת, ואחריו משפט אחד: "השידור הבא יתחיל ביום ראשון, 15/11/2026, בשעה 21:30"
+    function nextLines(lead, w) {
       const d = cfg.design;
-      const lines = [d.showName ? w.name : "", d.showDate ? windowDateText(w) : "", `בשעה ${w.startText}`];
+      const date = d.showDate ? windowDateText(w) : "";
+      lead = (lead || "").trim();
+      let when;
+      if (/ב\s*[:\-־]?$/.test(lead)) {
+        // הטקסט נגמר ב"ב:" / "ב-" - מחברים ישירות: "יתחיל ביום ראשון..." / "יתחיל ב-21:30"
+        const base = lead.replace(/\s*[:\-־]?$/, "");
+        when = date ? `${base}${date}, בשעה ${w.startText}` : `${base}-${w.startText}`;
+      } else {
+        when = [lead, date ? `${date}, בשעה ${w.startText}` : `בשעה ${w.startText}`].filter(Boolean).join(" ");
+      }
+      const lines = [d.showName ? w.name : "", when];
       lines.name = w.name;
       return lines;
     }
@@ -419,9 +430,9 @@
       } else if (state === "none" || !next) {
         show({ title: t.noneTitle, lines: [t.noneText], replay, watch });
       } else if (state === "ended") {
-        show({ title: t.endedTitle, lines: [t.endedLead, ...nextLines(next)], label: next.label, countdownTo: next.openAt, replay, watch });
+        show({ title: t.endedTitle, lines: nextLines(t.endedLead, next), label: next.label, countdownTo: next.openAt, replay, watch });
       } else {
-        show({ title: t.notStartedTitle, lines: [t.notStartedLead, ...nextLines(next)], label: next.label, countdownTo: next.openAt, replay, watch });
+        show({ title: t.notStartedTitle, lines: nextLines(t.notStartedLead, next), label: next.label, countdownTo: next.openAt, replay, watch });
       }
       previousState = state;
     }

@@ -14,8 +14,8 @@
 - `sites/<שם-תיקייה>/history/*` - גרסאות קודמות (אדמין בלבד)
 
 ## ניהול
-פאנל הניהול: `https://reembir.com/b/admin/` (כניסה עם Google).
-להוספת פרויקט חדש לפאנל: מוסיפים שורה ל-`SITES` ב-`admin/admin.js`.
+פאנל הניהול של קופה ראשית: `https://reembir.com/b/kupa-rashit/admin/` (כניסה עם Google).
+הכתובת הישנה `reembir.com/b/admin/` מעבירה אליו אוטומטית.
 
 ## פריסת חוקים מחדש
 ```
