@@ -191,11 +191,26 @@ $("edForm").addEventListener("submit", async e => {
     document.activeElement?.blur();
     const c = $("donePrev");
     drawMeme(c, curImg, t, 700);
+    try { sessionStorage.removeItem("memes-reloaded"); } catch {}
     $("done").hidden = false;
     setSteps(3);
   } catch (err) {
     console.error(err);
-    toast("השליחה נכשלה. בדקו חיבור לאינטרנט ונסו שוב", true);
+    const code = String(err?.code || "");
+    let reloaded = false;
+    try { reloaded = sessionStorage.getItem("memes-reloaded") === "1"; } catch {}
+    if (code === "permission-denied" && reloaded) {
+      toast("המם הזה לא נשלח (נדחה על ידי השרת). נסו תמונה אחרת", true, 5000);
+    } else if (code === "permission-denied") {
+      // בדרך כלל: הדף ישן (נפתח לפני עדכון באתר). רענון מביא את הגרסה החדשה
+      toast("האתר התעדכן - מרעננים את הדף, ואז שולחים שוב 🔄", true, 5000);
+      try { sessionStorage.setItem("memes-reloaded", "1"); sessionStorage.setItem("memes-draft", JSON.stringify({ id: cur.id, cat, top: t.top, bottom: t.bottom, size: t.size })); } catch {}
+      setTimeout(() => location.reload(), 2200);
+    } else if (!navigator.onLine || code === "unavailable") {
+      toast("אין חיבור לאינטרנט. בדקו את החיבור ונסו שוב", true, 4000);
+    } else {
+      toast("השליחה נכשלה (" + (code || err?.message || "שגיאה") + "). נסו שוב", true, 5000);
+    }
   } finally {
     sending = false;
     $("send").disabled = false;
@@ -214,13 +229,13 @@ $("helpClose").onclick = () => { $("help").hidden = true; store.set("memes-help"
 $("help").addEventListener("click", e => { if (e.target === $("help")) $("helpClose").click(); });
 
 let toastT;
-function toast(msg, err = false) {
+function toast(msg, err = false, ms = 2800) {
   const t = $("toast");
   t.textContent = msg;
   t.classList.toggle("err", err);
   t.classList.add("show");
   clearTimeout(toastT);
-  toastT = setTimeout(() => t.classList.remove("show"), 2800);
+  toastT = setTimeout(() => t.classList.remove("show"), ms);
 }
 
 window.addEventListener("hashchange", () => {
@@ -231,3 +246,18 @@ window.addEventListener("hashchange", () => {
 loadFonts();
 selectCat(decodeURIComponent(location.hash.slice(1)) || store.get("memes-cat", CATEGORIES[0].id));
 if (!store.get("memes-help", "")) $("help").hidden = false;
+
+// שחזור טיוטה אחרי רענון אוטומטי
+(async () => {
+  let d = null;
+  try { d = JSON.parse(sessionStorage.getItem("memes-draft") || "null"); sessionStorage.removeItem("memes-draft"); } catch {}
+  if (!d) return;
+  $("help").hidden = true;
+  try {
+    const m = (await fetchCategory(d.cat)).find(x => x.id === d.id);
+    if (!m) return;
+    $("tTop").value = d.top || ""; $("tBot").value = d.bottom || ""; $("tSize").value = Math.round((d.size || 1) * 100);
+    openEditor(m, true);
+    toast("הטקסט נשמר - אפשר לשלוח שוב 🚀", false, 3500);
+  } catch {}
+})();

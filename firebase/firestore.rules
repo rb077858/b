@@ -128,8 +128,9 @@ service cloud.firestore {
     //  נשמרים רק הקישור לתמונה של memeking והטקסטים
     // =================================================================
     function memeImg(u) {
-      return u is string && u.size() <= 300
-        && u.matches('https://storage[.]googleapis[.]com/meme-king-storage/[A-Za-z0-9_./-]+');
+      // כל תו ASCII מודפס (יש קישורים עם %2F, סוגריים וכו'), רק מהדלי של memeking
+      return u is string && u.size() <= 1000
+        && u.matches('https://storage[.]googleapis[.]com/meme-king-storage/[!-~]+');
     }
     function str(v, max) {
       return v is string && v.size() <= max;
