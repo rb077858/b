@@ -81,3 +81,52 @@
   .nav { width: 48px; height: 48px; }
   .nav.prev { right: 12px; } .nav.next { left: 12px; }
 }
+
+/* ---------- בחירה מרובה ---------- */
+.hdr-acts { display: flex; align-items: center; gap: 8px; }
+.sel-btn {
+  height: 42px; padding: 0 14px; border-radius: 999px;
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.07); font-weight: 700; font-size: 15px;
+  transition: background .15s, color .15s;
+}
+.sel-btn svg { width: 20px; height: 20px; fill: currentColor; }
+.sel-btn.on { background: var(--acc); color: #1a1400; }
+.card .check {
+  position: absolute; top: 8px; inset-inline-end: 8px;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2.5px solid #fff; background: rgba(0,0,0,.35);
+  box-shadow: 0 2px 8px rgba(0,0,0,.4);
+  display: none; place-items: center;
+}
+.selecting .card .check { display: grid; }
+.card.sel .check { background: var(--acc); border-color: var(--acc); }
+.card.sel .check::after { content: ""; width: 11px; height: 6px; border: solid #1a1400; border-width: 0 0 3px 3px; transform: translateY(-2px) rotate(-45deg); }
+.card.sel { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc); }
+.card.sel .pic canvas { opacity: .8; }
+.selecting .card { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.selecting .main { padding-bottom: calc(150px + var(--safe-b)); }
+
+.bulk {
+  position: fixed; z-index: 40; left: 0; right: 0; bottom: 0;
+  padding: 12px 14px calc(12px + var(--safe-b));
+  background: rgba(28,24,56,.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line); box-shadow: 0 -10px 30px rgba(0,0,0,.35);
+  animation: slide .22s cubic-bezier(.2,.8,.2,1);
+}
+.bulk-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.bulk-top strong { font-size: 16px; }
+.bulk-top .link-btn { margin: 0; }
+.bulk-top .icon-btn { margin-inline-start: auto; }
+.icon-btn.sm { width: 36px; height: 36px; }
+.icon-btn.sm svg { width: 18px; height: 18px; }
+.bulk-acts { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 8px; }
+.bulk-acts button { height: 48px; padding: 0 8px; font-size: 15px; }
+.bulk-acts i { font-style: normal; }
+.bulk-acts button:disabled { opacity: .4; cursor: default; box-shadow: none; }
+@media (max-width: 380px) { .bulk-acts span { font-size: 13px; } .sel-btn span { display: none; } }
+@media (min-width: 900px) {
+  .bulk { left: 50%; right: auto; bottom: 20px; transform: translateX(-50%); width: 560px; border-radius: 20px; border: 1px solid var(--line); }
+  @keyframes bslide { from { opacity: 0; transform: translate(-50%, 20px); } }
+  .bulk { animation-name: bslide; }
+}

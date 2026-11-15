@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Heebo:wght@400;500;700;800;900&display=swap">
-  <link rel="stylesheet" href="../style.css?v=20261115b">
-  <link rel="stylesheet" href="admin.css?v=20261115b">
+  <link rel="stylesheet" href="../style.css?v=20261115c">
+  <link rel="stylesheet" href="admin.css?v=20261115c">
 </head>
 <body>
   <div id="boot" class="boot"><div class="spin"></div></div>
@@ -41,9 +41,15 @@
           <p id="who"></p>
         </div>
       </div>
+      <div class="hdr-acts">
+      <button id="selBtn" class="sel-btn" title="בחירת כמה ממים">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5a2 2 0 0 1 2-2h9v2H5v14h14v-7h2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zm19.7-.3-1.4-1.4L12 12.6 8.7 9.3l-1.4 1.4 4.7 4.7z"/></svg>
+        <span>בחירה</span>
+      </button>
       <button id="logout" class="icon-btn" aria-label="יציאה" title="יציאה">
         <svg viewBox="0 0 24 24"><path d="M10 3h9a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-9v-2h9V5h-9zM8.4 7.4 9.8 8.8 7.6 11H15v2H7.6l2.2 2.2-1.4 1.4L3.8 12z"/></svg>
       </button>
+      </div>
     </header>
 
     <div class="filters" id="filters">
@@ -55,6 +61,20 @@
     <main class="main">
       <div id="list" class="agrid"></div>
     </main>
+
+    <!-- פעולות על כמה ממים -->
+    <div id="bulk" class="bulk" hidden>
+      <div class="bulk-top">
+        <strong id="bCount">בחרו ממים</strong>
+        <button id="bAll" class="link-btn">בחירת הכל</button>
+        <button id="bCancel" class="icon-btn sm" aria-label="סיום בחירה"><svg viewBox="0 0 24 24"><path d="M6.4 5 12 10.6 17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/></svg></button>
+      </div>
+      <div class="bulk-acts">
+        <button id="bDl" class="primary"><i>⬇️</i><span>הורדה</span></button>
+        <button id="bMark" class="ghost"><i>✅</i><span>סימון כהורד</span></button>
+        <button id="bDel" class="ghost danger"><i>🗑️</i><span>מחיקה</span></button>
+      </div>
+    </div>
   </div>
 
   <!-- צפייה במם -->
@@ -108,6 +128,6 @@
 
   <div id="toast" class="toast" role="status"></div>
 
-  <script type="module" src="admin.js?v=20261115b"></script>
+  <script type="module" src="admin.js?v=20261115c"></script>
 </body>
 </html>
