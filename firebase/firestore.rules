@@ -123,6 +123,37 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // =================================================================
+    //  מחולל הממים (memes) - כל אחד יכול לשלוח מם, רק אדמין רואה/עורך/מוחק
+    //  נשמרים רק הקישור לתמונה של memeking והטקסטים
+    // =================================================================
+    function memeImg(u) {
+      return u is string && u.size() <= 300
+        && u.matches('https://storage[.]googleapis[.]com/meme-king-storage/[A-Za-z0-9_./-]+');
+    }
+    function str(v, max) {
+      return v is string && v.size() <= max;
+    }
+    match /memes/{id} {
+      allow create: if request.resource.data.keys().hasOnly(
+            ['imageUrl', 'thumbUrl', 'sourceId', 'category', 'sourceDesc', 'top', 'bottom', 'size', 'name', 'status', 'createdAt'])
+        && request.resource.data.keys().hasAll(['imageUrl', 'top', 'bottom', 'size', 'status', 'createdAt'])
+        && memeImg(request.resource.data.imageUrl)
+        && (!('thumbUrl' in request.resource.data) || memeImg(request.resource.data.thumbUrl))
+        && str(request.resource.data.get('sourceId', ''), 60)
+        && str(request.resource.data.get('category', ''), 40)
+        && str(request.resource.data.get('sourceDesc', ''), 300)
+        && str(request.resource.data.top, 150)
+        && str(request.resource.data.bottom, 150)
+        && request.resource.data.top.size() + request.resource.data.bottom.size() > 0
+        && str(request.resource.data.get('name', ''), 40)
+        && request.resource.data.size is number
+        && request.resource.data.size >= 0.6 && request.resource.data.size <= 1.5
+        && request.resource.data.status == 'new'
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if isAdmin();
+    }
+
     // כל השאר - אדמין בלבד
     match /{document=**} {
       allow read, write: if isAdmin();
