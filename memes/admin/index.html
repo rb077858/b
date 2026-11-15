@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Heebo:wght@400;500;700;800;900&display=swap">
-  <link rel="stylesheet" href="../style.css?v=20261115c">
-  <link rel="stylesheet" href="admin.css?v=20261115c">
+  <link rel="stylesheet" href="../style.css?v=20261115d">
+  <link rel="stylesheet" href="admin.css?v=20261115d">
 </head>
 <body>
   <div id="boot" class="boot"><div class="spin"></div></div>
@@ -42,7 +42,10 @@
         </div>
       </div>
       <div class="hdr-acts">
-      <button id="selBtn" class="sel-btn" title="בחירת כמה ממים">
+      <button id="keysBtn" class="icon-btn kb-only" aria-label="קיצורי מקשים" title="קיצורי מקשים (?)">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm0 2v10h16V7zm2 2h2v2H6zm3 0h2v2H9zm3 0h2v2h-2zm3 0h3v2h-3zM6 12h2v2H6zm3 0h6v2H9zm7 0h2v2h-2z"/></svg>
+      </button>
+      <button id="selBtn" class="sel-btn" title="בחירת כמה ממים (S)">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5a2 2 0 0 1 2-2h9v2H5v14h14v-7h2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zm19.7-.3-1.4-1.4L12 12.6 8.7 9.3l-1.4 1.4 4.7 4.7z"/></svg>
         <span>בחירה</span>
       </button>
@@ -66,13 +69,13 @@
     <div id="bulk" class="bulk" hidden>
       <div class="bulk-top">
         <strong id="bCount">בחרו ממים</strong>
-        <button id="bAll" class="link-btn">בחירת הכל</button>
+        <button id="bAll" class="link-btn" title="Ctrl+A">בחירת הכל</button>
         <button id="bCancel" class="icon-btn sm" aria-label="סיום בחירה"><svg viewBox="0 0 24 24"><path d="M6.4 5 12 10.6 17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/></svg></button>
       </div>
       <div class="bulk-acts">
-        <button id="bDl" class="primary"><i>⬇️</i><span>הורדה</span></button>
-        <button id="bMark" class="ghost"><i>✅</i><span>סימון כהורד</span></button>
-        <button id="bDel" class="ghost danger"><i>🗑️</i><span>מחיקה</span></button>
+        <button id="bDl" class="primary" title="D"><i>⬇️</i><span>הורדה</span></button>
+        <button id="bMark" class="ghost" title="M"><i>✅</i><span>סימון כהורד</span></button>
+        <button id="bDel" class="ghost danger" title="Delete"><i>🗑️</i><span>מחיקה</span></button>
       </div>
     </div>
   </div>
@@ -80,7 +83,7 @@
   <!-- צפייה במם -->
   <section id="viewer" class="viewer" hidden>
     <div class="ed-head">
-      <button id="vClose" class="icon-btn" aria-label="סגירה">
+      <button id="vClose" class="icon-btn" aria-label="סגירה" title="Esc">
         <svg viewBox="0 0 24 24"><path d="M6.4 5 12 10.6 17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/></svg>
       </button>
       <div class="ed-title">
@@ -91,23 +94,23 @@
     </div>
     <div class="v-body">
       <div class="v-stage" id="vStage">
-        <button id="vPrev" class="nav prev" aria-label="הקודם"><svg viewBox="0 0 24 24"><path d="M8.6 5.4 10 4l8 8-8 8-1.4-1.4L15.2 12z"/></svg></button>
+        <button id="vPrev" class="nav prev" aria-label="הקודם" title="→"><svg viewBox="0 0 24 24"><path d="M8.6 5.4 10 4l8 8-8 8-1.4-1.4L15.2 12z"/></svg></button>
         <div class="ed-frame">
           <canvas id="vCv"></canvas>
           <div id="vLoad" class="cv-load"><div class="spin"></div></div>
         </div>
-        <button id="vNext" class="nav next" aria-label="הבא"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button>
+        <button id="vNext" class="nav next" aria-label="הבא" title="←"><svg viewBox="0 0 24 24"><path d="M15.4 5.4 14 4l-8 8 8 8 1.4-1.4L8.8 12z"/></svg></button>
       </div>
 
       <div class="v-side">
         <div id="vView">
           <dl class="info" id="vInfo"></dl>
           <div class="actions">
-            <button id="aDl" class="primary"><i>⬇️</i><span>הורדה</span></button>
-            <button id="aEdit" class="ghost"><i>✏️</i><span>עריכה</span></button>
-            <button id="aDel" class="ghost danger"><i>🗑️</i><span>מחיקה</span></button>
+            <button id="aDl" class="primary" title="D"><i>⬇️</i><span>הורדה</span></button>
+            <button id="aEdit" class="ghost" title="E"><i>✏️</i><span>עריכה</span></button>
+            <button id="aDel" class="ghost danger" title="Delete"><i>🗑️</i><span>מחיקה</span></button>
           </div>
-          <button id="aStatus" class="link-btn"></button>
+          <button id="aStatus" class="link-btn" title="M"></button>
         </div>
 
         <form id="vEdit" class="ed-form" hidden autocomplete="off">
@@ -126,8 +129,46 @@
     </div>
   </section>
 
+  <!-- קיצורי מקשים -->
+  <section id="keys" class="done" hidden>
+    <div class="done-card keys-card">
+      <h2>⌨️ קיצורי מקשים</h2>
+      <div class="kgrid">
+        <h3>ברשימה</h3>
+        <dl>
+          <dt><kbd>→</kbd><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd></dt><dd>מעבר בין ממים</dd>
+          <dt><kbd>Enter</kbd></dt><dd>פתיחת המם</dd>
+          <dt><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd></dt><dd>חדשים / הורדו / הכל</dd>
+          <dt><kbd>S</kbd></dt><dd>מצב בחירה</dd>
+          <dt><kbd>Space</kbd> / <kbd>X</kbd></dt><dd>בחירת המם המסומן</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>A</kbd></dt><dd>בחירת הכל</dd>
+          <dt><kbd>D</kbd></dt><dd>הורדה (של הנבחרים)</dd>
+          <dt><kbd>M</kbd></dt><dd>סימון הנבחרים כהורד / כחדש</dd>
+          <dt><kbd>Delete</kbd></dt><dd>מחיקת הנבחרים</dd>
+          <dt><kbd>Esc</kbd></dt><dd>יציאה ממצב בחירה</dd>
+        </dl>
+        <h3>בצפייה במם</h3>
+        <dl>
+          <dt><kbd>→</kbd><kbd>←</kbd></dt><dd>הקודם / הבא</dd>
+          <dt><kbd>D</kbd></dt><dd>הורדה</dd>
+          <dt><kbd>E</kbd></dt><dd>עריכה</dd>
+          <dt><kbd>M</kbd></dt><dd>סימון כהורד / כחדש</dd>
+          <dt><kbd>Delete</kbd></dt><dd>מחיקה</dd>
+          <dt><kbd>Esc</kbd></dt><dd>סגירה</dd>
+        </dl>
+        <h3>בעריכה</h3>
+        <dl>
+          <dt><kbd>Enter</kbd> / <kbd>Ctrl</kbd>+<kbd>S</kbd></dt><dd>שמירה</dd>
+          <dt><kbd>Esc</kbd></dt><dd>ביטול</dd>
+        </dl>
+      </div>
+      <p class="khint">עובד גם כשהמקלדת בעברית · <kbd>?</kbd> פותח את החלון הזה</p>
+      <button id="keysClose" class="primary">הבנתי</button>
+    </div>
+  </section>
+
   <div id="toast" class="toast" role="status"></div>
 
-  <script type="module" src="admin.js?v=20261115c"></script>
+  <script type="module" src="admin.js?v=20261115d"></script>
 </body>
 </html>
