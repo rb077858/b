@@ -136,7 +136,7 @@ service cloud.firestore {
     }
     match /memes/{id} {
       allow create: if request.resource.data.keys().hasOnly(
-            ['imageUrl', 'thumbUrl', 'sourceId', 'category', 'sourceDesc', 'top', 'bottom', 'size', 'name', 'status', 'createdAt'])
+            ['imageUrl', 'thumbUrl', 'sourceId', 'category', 'sourceDesc', 'top', 'bottom', 'size', 'status', 'createdAt'])
         && request.resource.data.keys().hasAll(['imageUrl', 'top', 'bottom', 'size', 'status', 'createdAt'])
         && memeImg(request.resource.data.imageUrl)
         && (!('thumbUrl' in request.resource.data) || memeImg(request.resource.data.thumbUrl))
@@ -146,7 +146,6 @@ service cloud.firestore {
         && str(request.resource.data.top, 150)
         && str(request.resource.data.bottom, 150)
         && request.resource.data.top.size() + request.resource.data.bottom.size() > 0
-        && str(request.resource.data.get('name', ''), 40)
         && request.resource.data.size is number
         && request.resource.data.size >= 0.6 && request.resource.data.size <= 1.5
         && request.resource.data.status == 'new'

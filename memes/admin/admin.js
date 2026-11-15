@@ -4,7 +4,7 @@
 //  צפייה בכל הממים שנשלחו, עריכה, מחיקה והורדה כתמונה.
 // =====================================================================
 import { app, db, SDK, ADMIN_EMAIL } from "../../firebase/config.js?v=20261101h";
-import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc } from "../meme.js?v=20261115a";
+import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc } from "../meme.js?v=20261115b";
 
 const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } =
   await import(`${SDK}/firebase-auth.js`);
@@ -99,7 +99,7 @@ function render() {
   });
   $("list").replaceChildren(frag);
 }
-const sig = m => JSON.stringify([m.top, m.bottom, m.size, m.name, m.status, m.imageUrl]);
+const sig = m => JSON.stringify([m.top, m.bottom, m.size, m.status, m.imageUrl]);
 
 function card(m) {
   const c = document.createElement("button");
@@ -108,7 +108,7 @@ function card(m) {
   c.dataset.sig = sig(m);
   c.innerHTML = `
     <div class="pic"><canvas></canvas>${isDl(m) ? `<span class="badge dl">הורד ✓</span>` : `<span class="badge">חדש</span>`}</div>
-    <div class="meta"><b>${esc(m.name || "אנונימי")}</b><span>${esc(when(m.createdAt))}</span></div>`;
+    <div class="meta"><b>${esc(m.top || m.bottom)}</b><span>${esc(when(m.createdAt))}</span></div>`;
   const cv = c.querySelector("canvas");
   Promise.all([loadImage(m.thumbUrl || m.imageUrl), loadFonts()])
     .then(([img]) => drawMeme(cv, img, m, 500))
@@ -157,7 +157,7 @@ async function showMeme(id, refresh = false) {
   $("vPos").textContent = i >= 0 ? `${i + 1} / ${view.length}` : "";
   $("vPrev").disabled = i <= 0;
   $("vNext").disabled = i < 0 || i >= view.length - 1;
-  $("vTitle").textContent = m.name || "אנונימי";
+  $("vTitle").textContent = "מם" + (i >= 0 ? ` #${view.length - i}` : "");
   $("vMeta").textContent = when(m.createdAt);
   $("vInfo").innerHTML = `
     ${m.top ? `<dt>למעלה</dt><dd>${esc(m.top)}</dd>` : ""}
@@ -246,8 +246,7 @@ $("aDl").onclick = async () => {
 };
 function fileName(m) {
   const d = m.createdAt?.toDate?.() || new Date();
-  const who = (m.name || "meme").replace(/[\\/:*?"<>|\s]+/g, "-").slice(0, 30);
-  return `meme-${d.toISOString().slice(0, 10)}-${who}-${m.id.slice(0, 5)}.jpg`;
+  return `meme-${d.toISOString().slice(0, 10)}-${m.id.slice(0, 6)}.jpg`;
 }
 
 $("aStatus").onclick = async () => {
@@ -288,7 +287,6 @@ $("aEdit").onclick = () => {
   $("eTop").value = m.top || "";
   $("eBot").value = m.bottom || "";
   $("eSize").value = Math.round(clampSize(m.size) * 100);
-  $("eName").value = m.name || "";
   setEditing(true);
 };
 ["eTop", "eBot", "eSize"].forEach(id => $(id).addEventListener("input", () => { if (vImg) drawMeme($("vCv"), vImg, editVals(), 1400); }));
@@ -301,7 +299,6 @@ $("vEdit").addEventListener("submit", async e => {
       top: v.top.trim().slice(0, 150),
       bottom: v.bottom.trim().slice(0, 150),
       size: Math.round(v.size * 100) / 100,
-      name: $("eName").value.trim().slice(0, 40),
       editedAt: serverTimestamp()
     });
     setEditing(false);
