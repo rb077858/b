@@ -101,6 +101,10 @@ const IMG = 'https://storage.googleapis.com/meme-king-storage/memes/israeli/abc.
 const meme = (o = {}) => ({ imageUrl: IMG, thumbUrl: IMG.replace('/memes/', '/meme-thumbs/'), sourceId: 'abc', category: 'israeli', sourceDesc: 'x', top: 'למעלה', bottom: '', size: 1, status: 'new', createdAt: serverTimestamp(), ...o });
 await ok('anon sends meme', addDoc(collection(anon, 'memes'), meme()));
 await no('no text', addDoc(collection(anon, 'memes'), meme({ top: '', bottom: '' })));
+await ok('encoded image url (%2F, parens)', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://storage.googleapis.com/meme-king-storage/memes%2Fmashups%2F1_(2)_n.jpg?alt=media&x=1', thumbUrl: 'https://storage.googleapis.com/meme-king-storage/meme-thumbs%2Fmashups%2F1.jpg' })));
+await ok('long image url (548)', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://storage.googleapis.com/meme-king-storage/' + 'a'.repeat(499) })));
+await no('image url with space', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://storage.googleapis.com/meme-king-storage/a b.jpg' })));
+await no('other bucket', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://storage.googleapis.com/evil-bucket/a.jpg' })));
 await no('foreign image', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://evil.com/a.jpg' })));
 await no('status downloaded', addDoc(collection(anon, 'memes'), meme({ status: 'downloaded' })));
 await no('extra field', addDoc(collection(anon, 'memes'), meme({ x: 1 })));
