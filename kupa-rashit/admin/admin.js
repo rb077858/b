@@ -1,12 +1,12 @@
 // =====================================================================
-//  פאנל ניהול "קופה ראשית" - reembir.com/b/admin
+//  פאנל ניהול "קופה ראשית" - reembir.com/b/kupa-rashit/admin
 //  כניסה עם Google (רק rb077858@gmail.com). כל שינוי נשמר אוטומטית ל-Firestore.
 // =====================================================================
-import { app, db, SDK, ADMIN_EMAIL, firebaseConfig } from "../firebase/config.js?v=20261101h";
+import { app, db, SDK, ADMIN_EMAIL, firebaseConfig } from "../../firebase/config.js?v=20261101h";
 import {
   SITE_ID, DEFAULT_CONFIG, PRESETS, FONTS, DAY_NAMES, mergeConfig, buildWindows, getStatus,
   israelParts, dateKey, todayKey, formatCountdown, isTime, isDate, pad2, uid
-} from "../kupa-rashit/schedule.js?v=20261101h";
+} from "../schedule.js?v=20261101h";
 
 const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } =
   await import(`${SDK}/firebase-auth.js`);
@@ -668,7 +668,7 @@ const VIEWS = {
         </div>
         <div class="preview-col">
           <div class="seg">${states.map(([s, l]) => `<button data-act="pstate" data-s="${s}" class="${previewState === s ? "on" : ""}">${l}</button>`).join("")}</div>
-          <div class="phone"><iframe id="preview" src="../kupa-rashit/?preview=1" title="תצוגה מקדימה" allow="autoplay; fullscreen; picture-in-picture"></iframe></div>
+          <div class="phone"><iframe id="preview" src="../?preview=1" title="תצוגה מקדימה" allow="autoplay; fullscreen; picture-in-picture"></iframe></div>
         </div>
       </div>`;
   },
@@ -776,7 +776,7 @@ function liveTick() {
     <div><div class="big">${labels[st.state]}${st.forced ? " (ידני)" : ""}</div>
       <div class="muted">${n && !n.forced ? `${esc(n.name)} · ${fmtDate(n.date)} · ${range(n.startText, n.endText)}${n.label ? " · " + esc(n.label) : ""}` : ""}</div></div>
     ${n && !n.forced && st.state !== "live" ? `<div class="cd"><b>${formatCountdown(n.openAt - now)}</b><small>עד השידור הבא</small></div>` : ""}
-    ${st.state === "live" ? `<a class="btn primary" href="../kupa-rashit/" target="_blank" rel="noopener" style="margin-inline-start:auto">לצפייה ↗</a>` : ""}`;
+    ${st.state === "live" ? `<a class="btn primary" href="../" target="_blank" rel="noopener" style="margin-inline-start:auto">לצפייה ↗</a>` : ""}`;
 }
 setInterval(() => { if (user && tab === "home") liveTick(); }, 1000);
 
