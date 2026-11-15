@@ -1,5 +1,5 @@
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import fs from 'fs';
 const env = await initializeTestEnvironment({ projectId: 'demo-rm', firestore: { host: '127.0.0.1', port: 8089, rules: fs.readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8') } });
 let pass = 0, fail = 0;
@@ -95,6 +95,27 @@ await ok('user reads config', getDoc(doc(A, 'rm_public/config')));
 await no('anon reads config', getDoc(doc(anon, 'rm_public/config')));
 await ok('admin creates user without code', setDoc(doc(ADM, 'rm_users/uAdm'), { email: 'rb077858@gmail.com', first: 'מ', last: 'נ', pid: 'pAdm', blocked: false, picks: [], w: {}, code: 'admin' }));
 await no('unverified admin email', setDoc(doc(FAKEADM, 'rm_secret/invite'), { code: 'x' }));
+
+console.log('--- ממים');
+const IMG = 'https://storage.googleapis.com/meme-king-storage/memes/israeli/abc.jpg';
+const meme = (o = {}) => ({ imageUrl: IMG, thumbUrl: IMG.replace('/memes/', '/meme-thumbs/'), sourceId: 'abc', category: 'israeli', sourceDesc: 'x', top: 'למעלה', bottom: '', size: 1, name: '', status: 'new', createdAt: serverTimestamp(), ...o });
+await ok('anon sends meme', addDoc(collection(anon, 'memes'), meme()));
+await no('no text', addDoc(collection(anon, 'memes'), meme({ top: '', bottom: '' })));
+await no('foreign image', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://evil.com/a.jpg' })));
+await no('status downloaded', addDoc(collection(anon, 'memes'), meme({ status: 'downloaded' })));
+await no('extra field', addDoc(collection(anon, 'memes'), meme({ x: 1 })));
+await no('size too big', addDoc(collection(anon, 'memes'), meme({ size: 5 })));
+await no('fake createdAt', addDoc(collection(anon, 'memes'), meme({ createdAt: 1 })));
+await no('text too long', addDoc(collection(anon, 'memes'), meme({ top: 'א'.repeat(151) })));
+await env.withSecurityRulesDisabled(async c => setDoc(doc(c.firestore(), 'memes/m1'), { ...meme(), createdAt: 1 }));
+await no('anon reads memes', getDocs(collection(anon, 'memes')));
+await no('user reads meme', getDoc(doc(A, 'memes/m1')));
+await no('user edits meme', updateDoc(doc(A, 'memes/m1'), { top: 'x' }));
+await no('user deletes meme', deleteDoc(doc(A, 'memes/m1')));
+await no('unverified admin reads memes', getDocs(collection(FAKEADM, 'memes')));
+await ok('admin reads memes', getDocs(collection(ADM, 'memes')));
+await ok('admin edits meme', updateDoc(doc(ADM, 'memes/m1'), { top: 'y', status: 'downloaded' }));
+await ok('admin deletes meme', deleteDoc(doc(ADM, 'memes/m1')));
 
 console.log('--- הקיים לא נשבר');
 await ok('anon reads sites/x', getDoc(doc(anon, 'sites/x')));
