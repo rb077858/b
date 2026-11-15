@@ -130,3 +130,21 @@
   @keyframes bslide { from { opacity: 0; transform: translate(-50%, 20px); } }
   .bulk { animation-name: bslide; }
 }
+
+/* ---------- קיצורי מקשים ---------- */
+.kb-only { display: none; }
+@media (hover: hover) and (pointer: fine) { .kb-only { display: grid; } }
+.keys-card { width: min(520px, 100%); text-align: right; }
+.keys-card h2 { text-align: center; margin-top: 0; }
+.kgrid h3 { margin: 16px 0 8px; font-size: 14px; color: var(--acc); }
+.kgrid dl { display: grid; grid-template-columns: 150px 1fr; gap: 8px 16px; margin: 0; align-items: center; }
+.kgrid dt { display: flex; gap: 4px; align-items: center; direction: ltr; justify-content: flex-end; white-space: nowrap; color: var(--mut); font-size: 13px; }
+.kgrid dd { margin: 0; font-size: 14.5px; }
+kbd {
+  display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px;
+  border-radius: 7px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
+  border-bottom-width: 3px; font: 700 12.5px/1 Heebo, system-ui, sans-serif; color: var(--txt);
+}
+.khint { text-align: center; margin: 18px 0 14px !important; font-size: 13px; }
+.card:focus-visible { outline: none; border-color: var(--vio); box-shadow: 0 0 0 3px var(--vio); }
+.card.sel:focus-visible { box-shadow: 0 0 0 3px var(--acc), 0 0 0 6px var(--vio); }

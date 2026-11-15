@@ -4,7 +4,7 @@
 //  צפייה בכל הממים שנשלחו, עריכה, מחיקה והורדה כתמונה.
 // =====================================================================
 import { app, db, SDK, ADMIN_EMAIL } from "../../firebase/config.js?v=20261101h";
-import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc } from "../meme.js?v=20261115c";
+import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc } from "../meme.js?v=20261115d";
 
 const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } =
   await import(`${SDK}/firebase-auth.js`);
@@ -280,6 +280,8 @@ function openViewer(id) {
   showMeme(id);
 }
 function closeViewer() {
+  const last = curId;
+  setTimeout(() => { const c = last && $("list").querySelector(`.card[data-id="${last}"]`); if (c && !matchMedia("(hover: none)").matches) c.focus({ preventScroll: true }); }, 0);
   curId = null; vToken++; setEditing(false);
   $("viewer").hidden = true;
   document.body.style.overflow = "";
@@ -333,13 +335,77 @@ function step(d) {
 }
 $("vPrev").onclick = () => step(-1);
 $("vNext").onclick = () => step(1);
+// ---------------------------------------------------------------------
+//  קיצורי מקשים (לפי המקש הפיזי - עובד גם במקלדת בעברית). ? = רשימת הקיצורים
+// ---------------------------------------------------------------------
+const cards = () => [...$("list").querySelectorAll(".card")];
+const press = id => { const b = $(id); if (b && !b.disabled && !b.hidden) b.click(); };
+function focusCard(i) {
+  const cs = cards();
+  if (!cs.length) return;
+  const c = cs[Math.max(0, Math.min(cs.length - 1, i))];
+  c.focus({ preventScroll: true });
+  c.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+function gridMove(dx, dy) {
+  const cs = cards();
+  const cols = getComputedStyle($("list")).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
+  const i = cs.indexOf(document.activeElement);
+  if (i < 0) return focusCard(0);
+  focusCard(i + dx + dy * cols);
+}
+function toggleHelp(show = $("keys").hidden) { $("keys").hidden = !show; }
+
 document.addEventListener("keydown", e => {
-  if ($("viewer").hidden && selectMode && e.key === "Escape") return setSelectMode(false);
-  if ($("viewer").hidden || editing) return;
-  if (e.key === "ArrowRight") step(-1);
-  else if (e.key === "ArrowLeft") step(1);
-  else if (e.key === "Escape") $("vClose").click();
+  if (!$("boot").hidden || !$("login").hidden) return;
+  const k = e.code, mod = e.ctrlKey || e.metaKey;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== "range";
+
+  if (!$("keys").hidden) { if (k === "Escape" || e.key === "?") { e.preventDefault(); toggleHelp(false); } return; }
+
+  // עריכה
+  if (editing) {
+    if (k === "Escape") { e.preventDefault(); press("eCancel"); }
+    else if (mod && (k === "KeyS" || k === "Enter")) { e.preventDefault(); $("vEdit").requestSubmit(); }
+    return;
+  }
+  if (typing || e.altKey) return;
+  if (e.key === "?" || (k === "Slash" && e.shiftKey)) { e.preventDefault(); return toggleHelp(true); }
+
+  // צפייה במם
+  if (!$("viewer").hidden) {
+    if (mod) return;
+    const map = { ArrowRight: () => step(-1), ArrowLeft: () => step(1), Escape: () => press("vClose"),
+      KeyD: () => press("aDl"), KeyE: () => press("aEdit"), KeyM: () => press("aStatus"),
+      Delete: () => press("aDel"), Backspace: () => press("aDel") };
+    if (map[k]) { e.preventDefault(); map[k](); }
+    return;
+  }
+
+  // רשימת הממים
+  if (mod && k === "KeyA") { e.preventDefault(); if (!selectMode) setSelectMode(true); return press("bAll"); }
+  if (mod) return;
+  const arrows = { ArrowRight: [-1, 0], ArrowLeft: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (arrows[k]) { e.preventDefault(); return gridMove(...arrows[k]); }
+  const f = { Digit1: "new", Digit2: "downloaded", Digit3: "all", Numpad1: "new", Numpad2: "downloaded", Numpad3: "all" }[k];
+  if (f) { e.preventDefault(); return document.querySelector(`#filters [data-f="${f}"]`).click(); }
+  const id = document.activeElement?.closest?.(".card")?.dataset.id;
+  const map = {
+    Escape: () => selectMode && setSelectMode(false),
+    KeyS: () => setSelectMode(!selectMode),
+    KeyX: () => { if (!id) return; if (!selectMode) setSelectMode(true); toggleSel(id); },
+    KeyD: () => selectMode ? press("bDl") : id && (openViewer(id), setTimeout(() => press("aDl"), 0)),
+    KeyM: () => selectMode && press("bMark"),
+    Delete: () => selectMode && press("bDel"),
+    Backspace: () => selectMode && press("bDel"),
+    Home: () => focusCard(0),
+    End: () => focusCard(cards().length - 1)
+  };
+  if (map[k]) { e.preventDefault(); map[k](); }
 });
+$("keysBtn").onclick = () => toggleHelp(true);
+$("keysClose").onclick = () => toggleHelp(false);
+$("keys").addEventListener("click", e => { if (e.target === $("keys")) toggleHelp(false); });
 // החלקה בטלפון: ימינה = הקודם, שמאלה = הבא (RTL)
 let tx = null, ty = null;
 $("vStage").addEventListener("touchstart", e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
