@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://storage.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Heebo:wght@400;500;700;800;900&display=swap">
-  <link rel="stylesheet" href="style.css?v=20261115b">
+  <link rel="stylesheet" href="style.css?v=20261115e">
 </head>
 <body>
   <header class="hdr">
@@ -62,16 +62,27 @@
           <canvas id="cv"></canvas>
           <div id="cvLoad" class="cv-load"><div class="spin"></div></div>
         </div>
+        <p class="drag-hint">✋ אפשר לגרור את הטקסט למקום אחר בתמונה</p>
       </div>
       <form id="edForm" class="ed-form" autocomplete="off">
-        <label class="fld">
-          <span class="lbl"><i>⬆️</i> טקסט עליון</span>
-          <input id="tTop" maxlength="150" placeholder="כשהמדריך אומר שיש עוד 5 דקות..." enterkeyhint="next">
-        </label>
-        <label class="fld">
-          <span class="lbl"><i>⬇️</i> טקסט תחתון</span>
-          <input id="tBot" maxlength="150" placeholder="...ועוברת עוד שעה" enterkeyhint="send">
-        </label>
+        <div class="fld">
+          <label class="lbl" for="tTop"><i>⬆️</i> טקסט עליון</label>
+          <div class="inrow">
+            <input id="tTop" maxlength="150" placeholder="כשהמדריך אומר שיש עוד 5 דקות..." enterkeyhint="next">
+            <button type="button" class="reset" data-k="top" disabled title="החזרה למיקום המקורי" aria-label="החזרת הטקסט העליון למיקום המקורי">
+              <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="fld">
+          <label class="lbl" for="tBot"><i>⬇️</i> טקסט תחתון</label>
+          <div class="inrow">
+            <input id="tBot" maxlength="150" placeholder="...ועוברת עוד שעה" enterkeyhint="send">
+            <button type="button" class="reset" data-k="bottom" disabled title="החזרה למיקום המקורי" aria-label="החזרת הטקסט התחתון למיקום המקורי">
+              <svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>
+            </button>
+          </div>
+        </div>
         <div class="fld">
           <span class="lbl"><i>🔠</i> גודל הטקסט</span>
           <div class="size-row">
@@ -118,6 +129,6 @@
 
   <div id="toast" class="toast" role="status"></div>
 
-  <script type="module" src="app.js?v=20261115c"></script>
+  <script type="module" src="app.js?v=20261115e"></script>
 </body>
 </html>

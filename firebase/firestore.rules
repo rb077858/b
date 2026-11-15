@@ -132,12 +132,18 @@ service cloud.firestore {
       return u is string && u.size() <= 1000
         && u.matches('https://storage[.]googleapis[.]com/meme-king-storage/[!-~]+');
     }
+    // מיקום טקסט שנגרר: מרכז הבלוק כשבר מגודל התמונה
+    function validPos(p) {
+      return p is map && p.keys().hasOnly(['x', 'y']) && p.keys().hasAll(['x', 'y'])
+        && p.x is number && p.y is number
+        && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+    }
     function str(v, max) {
       return v is string && v.size() <= max;
     }
     match /memes/{id} {
       allow create: if request.resource.data.keys().hasOnly(
-            ['imageUrl', 'thumbUrl', 'sourceId', 'category', 'sourceDesc', 'top', 'bottom', 'size', 'status', 'createdAt'])
+            ['imageUrl', 'thumbUrl', 'sourceId', 'category', 'sourceDesc', 'top', 'bottom', 'size', 'status', 'createdAt', 'topPos', 'bottomPos'])
         && request.resource.data.keys().hasAll(['imageUrl', 'top', 'bottom', 'size', 'status', 'createdAt'])
         && memeImg(request.resource.data.imageUrl)
         && (!('thumbUrl' in request.resource.data) || memeImg(request.resource.data.thumbUrl))
@@ -149,6 +155,8 @@ service cloud.firestore {
         && request.resource.data.top.size() + request.resource.data.bottom.size() > 0
         && request.resource.data.size is number
         && request.resource.data.size >= 0.6 && request.resource.data.size <= 1.5
+        && (!('topPos' in request.resource.data) || validPos(request.resource.data.topPos))
+        && (!('bottomPos' in request.resource.data) || validPos(request.resource.data.bottomPos))
         && request.resource.data.status == 'new'
         && request.resource.data.createdAt == request.time;
       allow read, update, delete: if isAdmin();

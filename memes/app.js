@@ -5,7 +5,7 @@
 // =====================================================================
 import { db } from "../firebase/config.js?v=20261101h";
 import { collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
-import { CATEGORIES, catName, fetchCategory, loadFonts, loadImage, drawMeme, clampSize, esc } from "./meme.js?v=20261115b";
+import { CATEGORIES, catName, fetchCategory, loadFonts, loadImage, drawMeme, clampSize, cleanPos, enableDrag, esc } from "./meme.js?v=20261115e";
 
 const $ = id => document.getElementById(id);
 const PAGE = 48;
@@ -102,7 +102,14 @@ $("search").addEventListener("input", e => {
 //  עורך
 // ---------------------------------------------------------------------
 const cv = $("cv");
-const texts = () => ({ top: $("tTop").value, bottom: $("tBot").value, size: clampSize(+$("tSize").value / 100) });
+// מיקומי הטקסט (null = מיקום ברירת מחדל)
+const pos = { top: null, bottom: null };
+const texts = () => ({ top: $("tTop").value, bottom: $("tBot").value, size: clampSize(+$("tSize").value / 100), topPos: pos.top, bottomPos: pos.bottom });
+function setPos(key, p) {
+  pos[key] = cleanPos(p);
+  document.querySelector(`.reset[data-k="${key}"]`).disabled = !pos[key];
+  redraw();
+}
 
 let raf = 0;
 function redraw() {
@@ -118,13 +125,15 @@ document.querySelectorAll(".sz").forEach(b => b.onclick = () => {
   r.value = Math.min(+r.max, Math.max(+r.min, +r.value + (+b.dataset.d) * 10));
   redraw();
 });
+enableDrag(cv, { enabled: () => !!curImg, onMove: setPos });
+document.querySelectorAll(".reset").forEach(b => b.onclick = () => setPos(b.dataset.k, null));
 $("tTop").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); $("tBot").focus(); } });
 
 async function openEditor(m, keepText = false) {
   if (!m) return;
   cur = m; curImg = null;
   const token = ++loadToken;
-  if (!keepText) { $("tTop").value = ""; $("tBot").value = ""; $("tSize").value = 100; }
+  if (!keepText) { $("tTop").value = ""; $("tBot").value = ""; $("tSize").value = 100; setPos("top", null); setPos("bottom", null); }
   $("edDesc").textContent = m.desc || catName(m.category);
   $("cvLoad").hidden = false;
   cv.style.visibility = "hidden";
@@ -185,6 +194,8 @@ $("edForm").addEventListener("submit", async e => {
       top: t.top,
       bottom: t.bottom,
       size: Math.round(t.size * 100) / 100,
+      ...(t.topPos && t.top ? { topPos: t.topPos } : {}),
+      ...(t.bottomPos && t.bottom ? { bottomPos: t.bottomPos } : {}),
       status: "new",
       createdAt: serverTimestamp()
     });
@@ -204,7 +215,7 @@ $("edForm").addEventListener("submit", async e => {
     } else if (code === "permission-denied") {
       // בדרך כלל: הדף ישן (נפתח לפני עדכון באתר). רענון מביא את הגרסה החדשה
       toast("האתר התעדכן - מרעננים את הדף, ואז שולחים שוב 🔄", true, 5000);
-      try { sessionStorage.setItem("memes-reloaded", "1"); sessionStorage.setItem("memes-draft", JSON.stringify({ id: cur.id, cat, top: t.top, bottom: t.bottom, size: t.size })); } catch {}
+      try { sessionStorage.setItem("memes-reloaded", "1"); sessionStorage.setItem("memes-draft", JSON.stringify({ id: cur.id, cat, top: t.top, bottom: t.bottom, size: t.size, topPos: t.topPos, bottomPos: t.bottomPos })); } catch {}
       setTimeout(() => location.reload(), 2200);
     } else if (!navigator.onLine || code === "unavailable") {
       toast("אין חיבור לאינטרנט. בדקו את החיבור ונסו שוב", true, 4000);
@@ -218,7 +229,7 @@ $("edForm").addEventListener("submit", async e => {
   }
 });
 
-$("doneSame").onclick = () => { $("done").hidden = true; setSteps(2); $("tTop").value = ""; $("tBot").value = ""; redraw(); $("tTop").focus(); };
+$("doneSame").onclick = () => { $("done").hidden = true; setSteps(2); $("tTop").value = ""; $("tBot").value = ""; setPos("top", null); setPos("bottom", null); $("tTop").focus(); };
 $("doneNew").onclick = () => { $("done").hidden = true; history.state?.ed ? history.back() : closeEditor(); };
 
 // ---------------------------------------------------------------------
@@ -257,6 +268,7 @@ if (!store.get("memes-help", "")) $("help").hidden = false;
     const m = (await fetchCategory(d.cat)).find(x => x.id === d.id);
     if (!m) return;
     $("tTop").value = d.top || ""; $("tBot").value = d.bottom || ""; $("tSize").value = Math.round((d.size || 1) * 100);
+    setPos("top", d.topPos); setPos("bottom", d.bottomPos);
     openEditor(m, true);
     toast("הטקסט נשמר - אפשר לשלוח שוב 🚀", false, 3500);
   } catch {}

@@ -105,6 +105,11 @@ await ok('encoded image url (%2F, parens)', addDoc(collection(anon, 'memes'), me
 await ok('long image url (548)', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://storage.googleapis.com/meme-king-storage/' + 'a'.repeat(499) })));
 await no('image url with space', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://storage.googleapis.com/meme-king-storage/a b.jpg' })));
 await no('other bucket', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://storage.googleapis.com/evil-bucket/a.jpg' })));
+await ok('with positions', addDoc(collection(anon, 'memes'), meme({ topPos: { x: 0.5, y: 0.3 }, bottomPos: { x: 0, y: 1 } })));
+await no('position out of range', addDoc(collection(anon, 'memes'), meme({ topPos: { x: 0.5, y: 1.2 } })));
+await no('position extra key', addDoc(collection(anon, 'memes'), meme({ topPos: { x: 0.5, y: 0.5, z: 1 } })));
+await no('position missing y', addDoc(collection(anon, 'memes'), meme({ bottomPos: { x: 0.5 } })));
+await no('position not a map', addDoc(collection(anon, 'memes'), meme({ topPos: 'center' })));
 await no('foreign image', addDoc(collection(anon, 'memes'), meme({ imageUrl: 'https://evil.com/a.jpg' })));
 await no('status downloaded', addDoc(collection(anon, 'memes'), meme({ status: 'downloaded' })));
 await no('extra field', addDoc(collection(anon, 'memes'), meme({ x: 1 })));
