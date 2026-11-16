@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beluga</title>
+<style>
+  :root{
+    --bg1:#03142b; --bg2:#0a3a63; --card:rgba(255,255,255,.07); --line:rgba(255,255,255,.14);
+    --text:#eaf6ff; --muted:#8fb4cf; --accent:#5ee7ff; --accent2:#8b7bff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Rubik,Arial,sans-serif;color:var(--text);
+    background:radial-gradient(1200px 700px at 50% -10%,var(--bg2),var(--bg1) 70%) fixed;
+    display:flex;justify-content:center;padding:24px 16px 48px;overflow-x:hidden;
+  }
+  .bubbles span{position:fixed;bottom:-40px;border-radius:50%;background:rgba(160,230,255,.12);
+    border:1px solid rgba(160,230,255,.25);animation:rise linear infinite;pointer-events:none;z-index:0}
+  @keyframes rise{to{transform:translateY(-115vh) translateX(30px);opacity:0}}
+  .wrap{position:relative;z-index:1;width:100%;max-width:560px}
+  .player{background:var(--card);border:1px solid var(--line);border-radius:28px;padding:28px 22px 22px;
+    backdrop-filter:blur(12px);box-shadow:0 20px 60px rgba(0,0,0,.45);text-align:center}
+  .cover{width:150px;height:150px;margin:0 auto 14px;border-radius:50%;display:grid;place-items:center;
+    font-size:76px;background:conic-gradient(from 0deg,var(--accent),var(--accent2),var(--accent));
+    box-shadow:0 0 0 6px rgba(255,255,255,.06),0 0 50px rgba(94,231,255,.35)}
+  .cover .inner{width:132px;height:132px;border-radius:50%;background:#062544;display:grid;place-items:center}
+  .playing .cover{animation:spin 8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  h1{margin:4px 0 2px;font-size:30px;letter-spacing:1px}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:20px}
+  .bar{direction:ltr;display:flex;align-items:center;gap:10px;font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted)}
+  input[type=range]{-webkit-appearance:none;appearance:none;flex:1;height:6px;border-radius:6px;cursor:pointer;
+    background:linear-gradient(90deg,var(--accent) var(--p,0%),rgba(255,255,255,.18) var(--p,0%))}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 0 10px var(--accent)}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border:0;border-radius:50%;background:#fff}
+  .controls{direction:ltr;display:flex;justify-content:center;align-items:center;gap:16px;margin:22px 0 16px}
+  button{font:inherit;color:var(--text);cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.08);
+    transition:transform .12s,background .2s,box-shadow .2s}
+  button:hover{background:rgba(255,255,255,.16)}
+  button:active{transform:scale(.92)}
+  .round{width:54px;height:54px;border-radius:50%;display:grid;place-items:center}
+  .round svg{width:24px;height:24px;fill:currentColor}
+  .play{width:78px;height:78px;border:0;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 10px 30px rgba(94,231,255,.4);color:#04223f}
+  .play:hover{background:linear-gradient(135deg,#7ff0ff,#a497ff);box-shadow:0 12px 40px rgba(94,231,255,.6)}
+  .play svg{width:34px;height:34px}
+  .small{position:relative;font-size:11px}
+  .small b{position:absolute;bottom:9px;font-size:10px}
+  .extras{direction:ltr;display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap}
+  .pill{border-radius:999px;padding:8px 14px;font-size:14px}
+  .pill.on{background:var(--accent);color:#04223f;border-color:transparent}
+  .vol{display:flex;align-items:center;gap:8px;min-width:150px}
+  .vol input{max-width:110px}
+  .err{display:none;margin-top:14px;color:#ffb4b4;font-size:14px}
+  .lyrics{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:18px 18px 8px}
+  .lyrics h2{margin:0 0 4px;font-size:18px;text-align:center}
+  .lyrics .hint{color:var(--muted);font-size:12px;text-align:center;margin-bottom:10px}
+  #lines{direction:ltr;text-align:center;max-height:360px;overflow-y:auto;scroll-behavior:smooth;padding:30px 4px;
+    mask-image:linear-gradient(transparent,#000 15%,#000 85%,transparent)}
+  #lines p{margin:0;padding:8px 6px;border-radius:12px;color:var(--muted);font-size:17px;line-height:1.4;cursor:pointer;
+    transition:color .25s,transform .25s,background .25s}
+  #lines p:hover{background:rgba(255,255,255,.06)}
+  #lines p.past{color:rgba(234,246,255,.55)}
+  #lines p.now{color:#fff;font-weight:700;transform:scale(1.06);text-shadow:0 0 18px rgba(94,231,255,.7)}
+</style>
+</head>
+<body>
+<div class="bubbles" id="bubbles"></div>
+<div class="wrap" id="app">
+  <div class="player">
+    <div class="cover"><div class="inner">🐋</div></div>
+    <h1>Beluga</h1>
+    <div class="sub">Bro (by Beluga)</div>
+
+    <div class="bar">
+      <span id="cur">0:00</span>
+      <input type="range" id="seek" min="0" max="1000" value="0" aria-label="מיקום בשיר">
+      <span id="dur">0:00</span>
+    </div>
+
+    <div class="controls">
+      <button class="round small" id="back" title="אחורה 10 שניות" aria-label="אחורה 10 שניות">
+        <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg><b>10</b></button>
+      <button class="round play" id="play" title="נגן / השהה" aria-label="נגן">
+        <svg viewBox="0 0 24 24" id="icon"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="round small" id="fwd" title="קדימה 10 שניות" aria-label="קדימה 10 שניות">
+        <svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7a6 6 0 1 0 6 6h2a8 8 0 1 1-8-8z"/></svg><b>10</b></button>
+    </div>
+
+    <div class="extras">
+      <button class="round" id="restart" title="מההתחלה" aria-label="מההתחלה" style="width:42px;height:42px">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+      <button class="pill" id="speed" title="מהירות">1×</button>
+      <button class="pill" id="loop" title="חזרה">🔁 חזרה</button>
+      <div class="vol">
+        <button class="round" id="mute" aria-label="השתק" style="width:42px;height:42px;font-size:18px">🔊</button>
+        <input type="range" id="volume" min="0" max="100" value="100" aria-label="עוצמה" style="--p:100%">
+      </div>
+    </div>
+    <div class="err" id="err">לא נמצא הקובץ beluga.mp3 בתיקייה.</div>
+  </div>
+
+  <div class="lyrics">
+    <h2>כתוביות</h2>
+    <div class="hint">לחיצה על שורה קופצת אליה בשיר</div>
+    <div id="lines"></div>
+  </div>
+</div>
+
+<audio id="audio" src="beluga.mp3" preload="metadata"></audio>
+
+<script>
+const LYRICS = [
+  "I will not breathe until MrBeast comments.",
+  "It's been two weeks, are you okay?",
+  "This is Billy's mom.",
+  "Unfortunately, Billy is not with us anymore.",
+  "Did he die?",
+  "Billy went to Disneyland two weeks ago, haven't heard from him since then.",
+  "You might want to text him.",
+  "Why?",
+  "He's been holding his breath for two weeks.",
+  "Um, Beluga, he texted me back.",
+  "What did he say?",
+  "This is Billy's girlfriend.",
+  "I have bad news, Billy is no longer in this world.",
+  "He died?",
+  "He went to Mars.",
+  "Just kidding, Billy doesn't have a girlfriend.",
+  "In fact, he doesn't even have a mom.",
+  "What?",
+  "This is Billy himself, and you just got pranked.",
+  "You liar, you've been breathing this whole time?",
+  "Nope, I've held my breath for two weeks.",
+  "How are you alive?",
+  "Humans are so easy to fool.",
+  "I'm not a human, I'm a deep sea bacteria.",
+  "I don't need to breathe oxygen.",
+  "In fact, bacteria are allergic to breathing.",
+  "If we breathe, we will die.",
+  "How can you type?",
+  "Enough about me, check the original comment.",
+  "Looks like you fell for my trap.",
+  "Do you have any last words?",
+  "The Fitnessgram Pacer Test is a multi-stage aerobic capacity test that-",
+  "Okay, that's enough, time to die.",
+  "Did you know the average human can go four minutes without oxygen?",
+  "Joke's on you, I'm not human, I'm a cat, cats need oxygen.",
+  "Oh, because of this comment, humanity is finished.",
+  "In 20 years, bacteria will spread and invade the earth,",
+  "take over schools, restaurants, the government.",
+  "Who will stop us then?",
+  "Hey!"
+];
+
+/* Optional exact timings (seconds). Fill in to sync precisely,
+   e.g. const TIMES = [0, 2.1, 4.5, ...]; leave empty to estimate. */
+const TIMES = [];
+
+const $ = id => document.getElementById(id);
+const audio = $('audio'), seek = $('seek'), linesEl = $('lines');
+const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0') : '0:00';
+
+LYRICS.forEach((t,i) => {
+  const p = document.createElement('p'); p.textContent = t;
+  p.onclick = () => { audio.currentTime = startOf(i); audio.play(); };
+  linesEl.appendChild(p);
+});
+const lineEls = [...linesEl.children];
+
+// Estimate start of each line by its share of characters (when TIMES not given)
+const weights = LYRICS.map(t => t.length + 8);
+const cum = weights.reduce((a,w,i) => (a.push((a[i]||0)+w), a), [0]);
+function startOf(i){
+  if (TIMES.length === LYRICS.length) return TIMES[i];
+  const d = audio.duration || 0;
+  return d * cum[i] / cum[cum.length-1];
+}
+let current = -1;
+function updateLyrics(){
+  const t = audio.currentTime; let idx = -1;
+  for (let i = 0; i < LYRICS.length; i++) if (t >= startOf(i)) idx = i;
+  if (!audio.duration || (audio.paused && t === 0)) idx = -1;
+  if (idx === current) return;
+  current = idx;
+  lineEls.forEach((p,i) => { p.classList.toggle('now', i === idx); p.classList.toggle('past', i < idx); });
+  if (idx >= 0) {
+    const p = lineEls[idx];
+    linesEl.scrollTop = p.offsetTop - linesEl.clientHeight/2 + p.clientHeight/2;
+  }
+}
+
+const PLAY = '<path d="M8 5v14l11-7z"/>', PAUSE = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
+function setP(el){ el.style.setProperty('--p', (el.value/el.max*100) + '%'); }
+
+$('play').onclick = () => audio.paused ? audio.play() : audio.pause();
+audio.onplay  = () => { $('icon').innerHTML = PAUSE; $('app').classList.add('playing'); };
+audio.onpause = () => { $('icon').innerHTML = PLAY;  $('app').classList.remove('playing'); };
+audio.onloadedmetadata = () => { $('dur').textContent = fmt(audio.duration); };
+audio.ontimeupdate = () => {
+  $('cur').textContent = fmt(audio.currentTime);
+  if (!seeking && audio.duration) { seek.value = audio.currentTime / audio.duration * 1000; setP(seek); }
+  updateLyrics();
+};
+audio.onerror = () => { $('err').style.display = 'block'; };
+
+let seeking = false;
+seek.oninput = () => { seeking = true; setP(seek); if (audio.duration) $('cur').textContent = fmt(seek.value/1000*audio.duration); };
+seek.onchange = () => { if (audio.duration) audio.currentTime = seek.value/1000*audio.duration; seeking = false; };
+
+$('back').onclick = () => audio.currentTime = Math.max(0, audio.currentTime - 10);
+$('fwd').onclick  = () => audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
+$('restart').onclick = () => { audio.currentTime = 0; audio.play(); };
+
+const speeds = [1, 1.25, 1.5, 2, 0.75];
+let si = 0;
+$('speed').onclick = () => { si = (si+1) % speeds.length; audio.playbackRate = speeds[si]; $('speed').textContent = speeds[si] + '×'; };
+$('loop').onclick = () => { audio.loop = !audio.loop; $('loop').classList.toggle('on', audio.loop); };
+
+const vol = $('volume');
+vol.oninput = () => { audio.volume = vol.value/100; audio.muted = false; setP(vol); $('mute').textContent = vol.value == 0 ? '🔇' : '🔊'; };
+$('mute').onclick = () => { audio.muted = !audio.muted; $('mute').textContent = audio.muted ? '🔇' : '🔊'; };
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target.tagName !== 'INPUT') { e.preventDefault(); $('play').click(); }
+  if (e.code === 'ArrowRight') $('fwd').click();
+  if (e.code === 'ArrowLeft') $('back').click();
+});
+
+// bubbles
+const b = $('bubbles');
+for (let i = 0; i < 14; i++) {
+  const s = document.createElement('span'), z = 8 + Math.random()*26;
+  s.style.cssText = `width:${z}px;height:${z}px;left:${Math.random()*100}%;animation-duration:${9+Math.random()*12}s;animation-delay:${-Math.random()*15}s`;
+  b.appendChild(s);
+}
+</script>
+</body>
+</html>
