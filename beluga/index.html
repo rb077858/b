@@ -58,9 +58,11 @@
   .lyrics{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:18px 18px 8px}
   .lyrics h2{margin:0 0 4px;font-size:18px;text-align:center}
   .lyrics .hint{color:var(--muted);font-size:12px;text-align:center;margin-bottom:10px}
-  #lines{direction:ltr;text-align:center;padding:10px 4px}
-  #lines p{margin:0;padding:8px 6px;border-radius:12px;color:var(--muted);font-size:17px;line-height:1.4;
+  #lines{position:relative;direction:ltr;text-align:center;max-height:360px;overflow-y:auto;padding:150px 4px;
+    mask-image:linear-gradient(transparent,#000 12%,#000 88%,transparent)}
+  #lines p{margin:0;padding:8px 6px;border-radius:12px;color:var(--muted);font-size:17px;line-height:1.4;cursor:pointer;
     transition:color .25s,transform .25s,background .25s}
+  #lines p:hover{background:rgba(255,255,255,.06)}
   #lines p.past{color:rgba(234,246,255,.55)}
   #lines p.now{color:#fff;font-weight:700;transform:scale(1.06);text-shadow:0 0 18px rgba(94,231,255,.7)}
 </style>
@@ -103,6 +105,7 @@
 
   <div class="lyrics">
     <h2>כתוביות</h2>
+    <div class="hint">לחיצה על שורה קופצת אליה בשיר</div>
     <div id="lines"></div>
   </div>
 </div>
@@ -153,9 +156,12 @@ const LYRICS = [
   "Hey!"
 ];
 
-/* Optional exact timings (seconds). Fill in to sync precisely,
-   e.g. const TIMES = [0, 2.1, 4.5, ...]; leave empty to estimate. */
-const TIMES = [];
+/* Start time (seconds) of each line, taken from the actual recording */
+const TIMES = [0, 3.9, 8.25, 10.85, 16.1, 17.85, 23.8, 26.9, 28.05, 32.7,
+  36.1, 37.8, 39.45, 43.7, 45.3, 47.65, 50.7, 55, 56.05, 60.2,
+  63.75, 67.7, 70.3, 72.5, 76.5, 79.5, 84.5, 87.9, 90.05, 94.05,
+  96.3, 99.05, 104, 106.35, 111.7, 115.9, 120.45, 125.25, 128.1, 130.3];
+const LEAD = 0.15; // highlight a hair before the word is sung
 
 const $ = id => document.getElementById(id);
 const audio = $('audio'), seek = $('seek'), linesEl = $('lines');
@@ -163,6 +169,10 @@ const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60))
 
 LYRICS.forEach((t,i) => {
   const p = document.createElement('p'); p.textContent = t;
+  p.onclick = () => {
+    if (Date.now() - lastScroll < 400) return; // ignore taps that were really scrolls
+    audio.currentTime = startOf(i); audio.play();
+  };
   linesEl.appendChild(p);
 });
 const lineEls = [...linesEl.children];
@@ -170,6 +180,9 @@ const lineEls = [...linesEl.children];
 // Estimate start of each line by its share of characters (when TIMES not given)
 const weights = LYRICS.map(t => t.length + 8);
 const cum = weights.reduce((a,w,i) => (a.push((a[i]||0)+w), a), [0]);
+let lastScroll = 0;
+linesEl.addEventListener('scroll', () => { if (!autoScrolling) lastScroll = Date.now(); }, {passive:true});
+let autoScrolling = false;
 function startOf(i){
   if (TIMES.length === LYRICS.length) return TIMES[i];
   const d = audio.duration || 0;
@@ -178,11 +191,18 @@ function startOf(i){
 let current = -1;
 function updateLyrics(){
   const t = audio.currentTime; let idx = -1;
-  for (let i = 0; i < LYRICS.length; i++) if (t >= startOf(i)) idx = i;
+  for (let i = 0; i < LYRICS.length; i++) if (t + LEAD >= startOf(i)) idx = i;
   if (!audio.duration || (audio.paused && t === 0)) idx = -1;
   if (idx === current) return;
   current = idx;
   lineEls.forEach((p,i) => { p.classList.toggle('now', i === idx); p.classList.toggle('past', i < idx); });
+  // scroll only inside the lyrics box (never the page), and not while the user is scrolling it
+  if (idx >= 0 && Date.now() - lastScroll > 2500) {
+    const p = lineEls[idx];
+    autoScrolling = true;
+    linesEl.scrollTo({top: p.offsetTop - linesEl.clientHeight/2 + p.clientHeight/2, behavior:'smooth'});
+    setTimeout(() => autoScrolling = false, 700);
+  }
 }
 
 const PLAY = '<path d="M8 5v14l11-7z"/>', PAUSE = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
@@ -201,7 +221,7 @@ audio.onerror = () => { $('err').style.display = 'block'; };
 
 let seeking = false;
 seek.oninput = () => { seeking = true; setP(seek); if (audio.duration) $('cur').textContent = fmt(seek.value/1000*audio.duration); };
-seek.onchange = () => { if (audio.duration) audio.currentTime = seek.value/1000*audio.duration; seeking = false; };
+seek.onchange = () => { if (seeking && audio.duration) audio.currentTime = seek.value/1000*audio.duration; seeking = false; };
 
 $('back').onclick = () => audio.currentTime = Math.max(0, audio.currentTime - 10);
 $('fwd').onclick  = () => audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 10);
