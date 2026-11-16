@@ -58,11 +58,9 @@
   .lyrics{margin-top:22px;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:18px 18px 8px}
   .lyrics h2{margin:0 0 4px;font-size:18px;text-align:center}
   .lyrics .hint{color:var(--muted);font-size:12px;text-align:center;margin-bottom:10px}
-  #lines{direction:ltr;text-align:center;max-height:360px;overflow-y:auto;scroll-behavior:smooth;padding:30px 4px;
-    mask-image:linear-gradient(transparent,#000 15%,#000 85%,transparent)}
-  #lines p{margin:0;padding:8px 6px;border-radius:12px;color:var(--muted);font-size:17px;line-height:1.4;cursor:pointer;
+  #lines{direction:ltr;text-align:center;padding:10px 4px}
+  #lines p{margin:0;padding:8px 6px;border-radius:12px;color:var(--muted);font-size:17px;line-height:1.4;
     transition:color .25s,transform .25s,background .25s}
-  #lines p:hover{background:rgba(255,255,255,.06)}
   #lines p.past{color:rgba(234,246,255,.55)}
   #lines p.now{color:#fff;font-weight:700;transform:scale(1.06);text-shadow:0 0 18px rgba(94,231,255,.7)}
 </style>
@@ -105,7 +103,6 @@
 
   <div class="lyrics">
     <h2>כתוביות</h2>
-    <div class="hint">לחיצה על שורה קופצת אליה בשיר</div>
     <div id="lines"></div>
   </div>
 </div>
@@ -166,7 +163,6 @@ const fmt = s => isFinite(s) ? Math.floor(s/60) + ':' + String(Math.floor(s%60))
 
 LYRICS.forEach((t,i) => {
   const p = document.createElement('p'); p.textContent = t;
-  p.onclick = () => { audio.currentTime = startOf(i); audio.play(); };
   linesEl.appendChild(p);
 });
 const lineEls = [...linesEl.children];
@@ -187,10 +183,6 @@ function updateLyrics(){
   if (idx === current) return;
   current = idx;
   lineEls.forEach((p,i) => { p.classList.toggle('now', i === idx); p.classList.toggle('past', i < idx); });
-  if (idx >= 0) {
-    const p = lineEls[idx];
-    linesEl.scrollTop = p.offsetTop - linesEl.clientHeight/2 + p.clientHeight/2;
-  }
 }
 
 const PLAY = '<path d="M8 5v14l11-7z"/>', PAUSE = '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>';
