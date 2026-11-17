@@ -6,6 +6,7 @@
 |---|---|
 | `config.js` | אתחול Firebase. כל דף מייבא ממנו: `import { db } from "../firebase/config.js"` |
 | `firestore.rules` | חוקי אבטחה: קריאה ציבורית ל-`sites/*`, כתיבה רק ל-rb077858@gmail.com. כולל גם את האוספים `rm_*` של "שותפים לחדר" (ראו `bchira/README.md`) |
+| (אוספים `ch_*`) | "תורנויות חדר": חדרים, תורנויות, התראות (ראו `cheder/README.md`) |
 | (אוסף `memes`) | הממים שנשלחו מ-`memes/`: כל אחד יוצר, רק אדמין קורא/עורך/מוחק (ראו `memes/README.md`) |
 | `rules-test/` | בדיקות לחוקים מול אמולטור |
 

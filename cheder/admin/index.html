@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0d9488">
+  <title>ניהול - תורנויות חדר</title>
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="../style.css?v=1">
+  <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem("ch-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) {}
+  </script>
+</head>
+<body class="admin">
+  <div id="boot" class="loader"><div class="spin"></div></div>
+
+  <section id="login" class="login hidden">
+    <div class="login-card">
+      <div class="logo">🛠️</div>
+      <h1>ניהול תורנויות חדר</h1>
+      <p>כניסה עם חשבון ה-Google של המנהל</p>
+      <button id="loginBtn" class="gbtn"></button>
+      <div id="loginErr" class="err"></div>
+    </div>
+  </section>
+
+  <div id="app" class="hidden">
+    <header class="hdr">
+      <div class="hdr-in">
+        <div class="brand"><div class="dot">🛠️</div><div class="grow"><b>ניהול תורנויות חדר</b><span id="hdrSub"></span></div></div>
+        <a class="icon-btn" href="../" title="לאתר" style="text-decoration:none">🏠</a>
+        <button class="icon-btn" id="themeBtn" title="מצב כהה/בהיר">🌓</button>
+        <button class="icon-btn" id="logoutBtn" title="התנתקות">🚪</button>
+      </div>
+    </header>
+    <main id="view"></main>
+    <nav class="tabs"><div class="tabs-in" id="tabs"></div></nav>
+  </div>
+
+  <script type="module" src="admin.js?v=1"></script>
+</body>
+</html>

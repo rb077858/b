@@ -162,6 +162,87 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // =================================================================
+    //  תורנויות חדר (cheder) - אוספים שמתחילים ב-ch_
+    //  רק מי שהאדמין צירף (ch_members/<מייל>) נכנס, ורק לחדר שלו
+    // =================================================================
+    function chEmail() {
+      return request.auth.token.email.lower();
+    }
+    function chPath() {
+      return /databases/$(database)/documents/ch_members/$(chEmail());
+    }
+    function chMember() {
+      return signedIn() && request.auth.token.email_verified == true && exists(chPath());
+    }
+    function chRoom() {
+      return get(chPath()).data.room;
+    }
+    function chMyRoom(room) {
+      return isAdmin() || (chMember() && chRoom() == room);
+    }
+    function chRooms(l, max) {
+      return l is list && l.size() <= max;
+    }
+
+    // מי מורשה ובאיזה חדר. מזהה = המייל באותיות קטנות. רק אדמין כותב
+    match /ch_members/{email} {
+      allow read: if isAdmin() || (signedIn() && request.auth.token.email_verified == true && email == chEmail());
+      allow write: if isAdmin();
+    }
+
+    // החדר: מי גר בו, היעדרויות, חריגים. רק החדר עצמו (והאדמין)
+    match /ch_rooms/{room} {
+      allow read, write: if chMyRoom(room);
+      match /days/{day} {
+        allow read, write: if chMyRoom(room);
+      }
+    }
+
+    // תורנויות קומה/מטבחון (מההודעה של המדריך). כל חדר מדביק, כולם רואים
+    match /ch_duties/{date} {
+      allow read: if isAdmin() || chMember();
+      allow create, update: if isAdmin() || (chMember()
+        && request.resource.data.keys().hasOnly(['date', 'floor', 'kitchen', 'raw', 'time', 'sender', 'newRound', 'by', 'byRoom', 'at'])
+        && request.resource.data.date == date
+        && chRooms(request.resource.data.floor, 6)
+        && chRooms(request.resource.data.kitchen, 3)
+        && request.resource.data.get('raw', '') is string
+        && request.resource.data.get('raw', '').size() <= 3000
+        && request.resource.data.by == chEmail()
+        && request.resource.data.byRoom == chRoom());
+      allow delete: if isAdmin();
+    }
+
+    // חריגים לכל הפנימייה (חופשה, טיול, העברת יום שטיפה...). מי שיצר או אדמין עורך ומוחק
+    match /ch_events/{id} {
+      allow read: if isAdmin() || chMember();
+      allow create: if isAdmin() || (chMember()
+        && request.resource.data.keys().hasOnly(['type', 'from', 'to', 'title', 'by', 'byRoom', 'at'])
+        && request.resource.data.type in ['off', 'on', 'mopmove', 'mop', 'nomop', 'noduty', 'note']
+        && request.resource.data.from is string
+        && request.resource.data.get('title', '') is string
+        && request.resource.data.get('title', '').size() <= 80
+        && request.resource.data.by == chEmail()
+        && request.resource.data.byRoom == chRoom());
+      allow update: if isAdmin() || (chMember()
+        && resource.data.byRoom == chRoom()
+        && request.resource.data.byRoom == chRoom()
+        && request.resource.data.by == chEmail()
+        && request.resource.data.type in ['off', 'on', 'mopmove', 'mop', 'nomop', 'noduty', 'note']
+        && request.resource.data.get('title', '').size() <= 80);
+      allow delete: if isAdmin() || (chMember() && resource.data.byRoom == chRoom());
+    }
+
+    // מכשירים שהפעילו התראות. כל אחד רואה ומוחק רק את שלו. הפונקציות בענן קוראות הכל
+    match /ch_tokens/{token} {
+      allow read, delete: if isAdmin() || (signedIn() && resource.data.email == chEmail());
+      allow create, update: if chMember()
+        && request.resource.data.email == chEmail()
+        && request.resource.data.room == chRoom()
+        && request.resource.data.keys().hasOnly(['email', 'room', 'notifyTime', 'morning', 'duty', 'ua', 'at']);
+    }
+
     // כל השאר - אדמין בלבד
     match /{document=**} {
       allow read, write: if isAdmin();
