@@ -70,7 +70,7 @@ let hist = [];
 for (let i = 0; i < 60; i++) {
   const key = C.addDays("2026-09-01", i);
   const { plan } = C.buildPlan({ key, room: "41", residents, absences: [], duty: i % 6 < 3 ? duty : null, history: hist.slice(-30), existing: null });
-  hist.push(plan);
+  hist.push({ ...plan, done: Object.fromEntries(plan.tasks.map(t => [t, true])) });
 }
 const st = C.computeStats(hist, ["a", "b", "c"]);
 const loads = ["a", "b", "c"].map(id => st[id].load);
@@ -101,6 +101,20 @@ const grown = C.buildPlan({ ...args, existing: { ...solo, done: { table: true },
 eq("new roommate -> re-split (done stays)", [grown.assign.table, new Set(Object.values(grown.assign)).size > 1], ["a", true]);
 const back = C.buildPlan({ ...args, existing: { ...base, done: {}, manual: { sweep: true } } }).plan;
 eq("manual swap kept", back.assign.sweep, base.assign.sweep);
+
+// מי שלא מסמן שביצע - מקבל יותר
+let h2 = [];
+for (let i = 0; i < 30; i++) {
+  const key = C.addDays("2026-09-01", i);
+  const { plan } = C.buildPlan({ key, room: "41", residents, absences: [], duty: null, history: h2, existing: null });
+  h2.push({ ...plan, done: Object.fromEntries(plan.tasks.filter(t => plan.assign[t] !== "c").map(t => [t, true])) });
+}
+const assigned = C.computeStats(h2, ["a", "b", "c"]);
+const wOf = id => h2.reduce((x, d) => x + Object.entries(d.assign).filter(([, r]) => r === id).reduce((y, [t]) => y + C.TASKS[t].w, 0), 0);
+console.log("        assigned counts:", ["a", "b", "c"].map(id => assigned[id].count).join(", "), " weight:", ["a", "b", "c"].map(wOf).join(", "));
+eq("slacker gets more tasks", assigned.c.count > assigned.a.count && assigned.c.count > assigned.b.count, true);
+eq("slacker capped (not everything)", assigned.a.count > 0 && assigned.b.count > 0, true);
+eq("slacker load stays 0", assigned.c.load, 0);
 
 console.log("--- מאגר משותף");
 const sh = [{ date: "2026-11-16", floor: ["37"], kitchen: ["39"] }, { date: "2026-11-19", floor: ["50"], kitchen: [] }];

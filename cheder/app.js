@@ -8,8 +8,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, colorOf, initials, GOOGLE_SVG
-} from "./common.js?v=5";
-import * as C from "./core.js?v=5";
+} from "./common.js?v=6";
+import * as C from "./core.js?v=6";
 
 const { doc, collection, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, runTransaction, writeBatch, serverTimestamp, deleteField, arrayUnion, arrayRemove } = FS;
 
@@ -446,7 +446,7 @@ function vRoom() {
   const max = Math.max(1, ...act.map(r => st[r.id].load));
   h += `<div class="sec-title">הוגנות - 30 הימים האחרונים</div><div class="card">${hist.length ? `<table class="stats"><thead><tr><th>שם</th><th>ימים</th><th>משימות</th><th>בוצע</th><th style="width:30%">עומס</th></tr></thead><tbody>
     ${act.map(r => { const s = st[r.id]; const dn = doneOf(r.id); return `<tr><td><b>${esc(r.name)}</b></td><td>${s.days}</td><td>${s.count}</td><td>${s.count ? Math.round(dn / s.count * 100) + "%" : "—"}</td><td><div class="meter"><div style="width:${s.load / max * 100}%"></div></div></td></tr>`; }).join("")}
-    </tbody></table><p class="muted small" style="margin-bottom:0">המערכת מחלקת כל בוקר מחדש: קודם מאזנת את היום, ואז נותנת יותר למי שעשה פחות לאורך זמן (בהתחשב בימים שהיה בחדר). שטיפה ושירותים "שווים" יותר משולחן.</p>` : `<div class="muted small">הנתונים יופיעו אחרי כמה ימים.</div>`}</div>`;
+    </tbody></table><p class="muted small" style="margin-bottom:0">המערכת מחלקת כל בוקר מחדש: קודם מאזנת את היום, ואז נותנת יותר למי שעשה פחות לאורך זמן (בהתחשב בימים שהיה בחדר). נספר רק מה שסומן ✓ - מי שלא סימן ייחשב כאילו לא עשה ויקבל יותר. שטיפה ושירותים "שווים" יותר משולחן.</p>` : `<div class="muted small">הנתונים יופיעו אחרי כמה ימים.</div>`}</div>`;
   return h;
 }
 function ownSettingsHtml() {
@@ -921,7 +921,7 @@ function helpSheet() {
       <div class="li"><span class="emo">⇄</span><div class="tx"><b>החלפות</b><span>האחראי מעביר משימה (⇄) או מחליף בין שניים את כל המשימות (⋯ ← החלפת תורנות).</span></div></div>
       <div class="li"><span class="emo">🏖️</span><div class="tx"><b>חופשות, טיולים ושינויים</b><span>בלשונית "השבוע". משותף לכל הפנימייה או רק לחדר, ואפשר לסמן שינוי משותף "לא חל עלינו".</span></div></div>
       <div class="li"><span class="emo">🔌</span><div class="tx"><b>מצב עצמאי</b><span>בלשונית "החדר" אפשר לצאת מהמאגר המשותף ולנהל הכל לבד, כולל ימי ניקיון ויום שטיפה.</span></div></div>
-      <div class="li"><span class="emo">⚖️</span><div class="tx"><b>הוגנות</b><span>מי שעשה פחות לאורך זמן מקבל קודם. שטיפה ושירותים נחשבים יותר משולחן.</span></div></div>
+      <div class="li"><span class="emo">⚖️</span><div class="tx"><b>הוגנות</b><span>מי שעשה פחות לאורך זמן מקבל קודם. נספר רק מה שסומן ✓ - לכן חשוב לסמן! שטיפה ושירותים נחשבים יותר משולחן.</span></div></div>
     </div><div class="btns"><button class="btn block" data-act="close">סגירה</button></div>`);
 }
 

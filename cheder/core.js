@@ -243,7 +243,7 @@ export function presentOn(residents, absences, key) {
 // ---------------------------------------------------------------------
 //  חלוקה הוגנת
 //  1. קודם כל מאזנים את היום (סכום משקלים דומה לכל אחד)
-//  2. אחר כך לפי ממוצע עומס לאורך זמן (מי שעשה פחות - מקבל קודם)
+//  2. אחר כך לפי ממוצע עומס לאורך זמן - רק משימות שבוצעו (מי שעשה פחות - מקבל קודם)
 //  3. מנסים לא לתת לאותו אחד את אותה משימה פעמיים ברצף
 //  4. שובר שוויון קבוע לפי היום, כך שכל מכשיר יחשב בדיוק אותו דבר
 // ---------------------------------------------------------------------
@@ -258,7 +258,9 @@ export function computeStats(history, ids) {
     for (const id of h.present || []) if (st[id]) st[id].days++;
     for (const [t, id] of Object.entries(h.assign || {})) {
       if (!st[id]) continue;
-      st[id].load += W(t); st[id].count++;
+      st[id].count++;
+      // לעומס נספרות רק משימות שסומנו כבוצעו - מי שלא עשה, יקבל יותר בימים הבאים
+      if (h.done && h.done[t]) { st[id].load += W(t); st[id].done = (st[id].done || 0) + 1; }
       st[id].tasks[t] = (st[id].tasks[t] || 0) + 1;
       if (!st[id].last[t] || h.date > st[id].last[t]) st[id].last[t] = h.date;
     }
@@ -286,7 +288,9 @@ export function assignTasks({ tasks, present, history = [], key, keep = {} }) {
     let best = null, bestScore = Infinity;
     for (const id of present) {
       const s = st[id];
-      const score = today[id] * 100
+      // "חוב": כמה פחות ממה שמצופה (לפי הימים שהיה) הוא עשה בפועל. מוגבל, כדי שלא יקבל הכל ביום אחד
+      const owed = s.days > 0 ? Math.max(-2, Math.min(2, avg * s.days - s.load)) : 0;
+      const score = (today[id] - owed * 0.5) * 100
         + rate(id) * 10
         + (s.days ? (s.tasks[t] || 0) / s.days : 0) * 8
         + (prevDay && s.last[t] === prevDay ? 15 : 0)
