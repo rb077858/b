@@ -4,7 +4,7 @@
 //  צפייה בכל הממים שנשלחו, עריכה, מחיקה והורדה כתמונה.
 // =====================================================================
 import { app, db, SDK, ADMIN_EMAIL } from "../../firebase/config.js?v=20261101h";
-import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc, cleanPos, enableDrag } from "../meme.js?v=20261115e";
+import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc, cleanPos, enableDrag } from "../meme.js?v=20261117a";
 
 const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } =
   await import(`${SDK}/firebase-auth.js`);
@@ -17,7 +17,7 @@ const provider = new GoogleAuthProvider();
 provider.setCustomParameters({ login_hint: ADMIN_EMAIL, prompt: "select_account" });
 
 let memes = [], view = [], filter = "new", unsub = null;
-let curId = null, vToken = 0, vImg = null, editing = false;
+let curId = null, curIdx = 0, vToken = 0, vImg = null, editing = false;
 
 const show = id => ["boot", "login", "app"].forEach(x => $(x).hidden = x !== id);
 
@@ -61,8 +61,11 @@ function listen() {
     for (const id of selected) if (!memes.some(m => m.id === id)) selected.delete(id);
     render();
     if (curId) {
-      if (!memes.some(m => m.id === curId)) closeViewer();
-      else if (!editing) showMeme(curId, true);
+      if (!memes.some(m => m.id === curId)) {
+        // המם נמחק - עוברים למם שתפס את מקומו, ונסגרים רק אם לא נשאר כלום
+        const n = view[Math.min(curIdx, view.length - 1)];
+        if (n) showMeme(n.id); else closeViewer();
+      } else if (!editing) showMeme(curId, true);
     }
   }, err => {
     console.error(err);
@@ -296,9 +299,11 @@ async function showMeme(id, refresh = false) {
   curId = id;
   if (changed) setEditing(false);
   const i = view.findIndex(x => x.id === id);
+  if (i >= 0) curIdx = i;
   $("vPos").textContent = i >= 0 ? `${i + 1} / ${view.length}` : "";
-  $("vPrev").disabled = i <= 0;
-  $("vNext").disabled = i < 0 || i >= view.length - 1;
+  // אם המם יצא מהסינון (למשל הורד בזמן צפייה ב"חדשים") - הניווט ממשיך מהמקום שלו
+  $("vPrev").disabled = i >= 0 ? i <= 0 : curIdx <= 0;
+  $("vNext").disabled = i >= 0 ? i >= view.length - 1 : curIdx >= view.length;
   $("vTitle").textContent = "מם" + (i >= 0 ? ` #${view.length - i}` : "");
   $("vMeta").textContent = when(m.createdAt);
   $("vInfo").innerHTML = `
@@ -330,7 +335,8 @@ async function showMeme(id, refresh = false) {
 
 function step(d) {
   const i = view.findIndex(x => x.id === curId);
-  const n = view[i + d];
+  // המם הנוכחי כבר לא ברשימה: הבא = מי שתפס את מקומו, הקודם = זה שלפניו
+  const n = i >= 0 ? view[i + d] : view[d > 0 ? curIdx : curIdx - 1];
   if (n && !editing) showMeme(n.id);
 }
 $("vPrev").onclick = () => step(-1);
@@ -476,12 +482,17 @@ $("aDel").onclick = async () => {
   const m = byId(curId);
   if (!m || !confirm("למחוק את המם לצמיתות?")) return;
   const i = view.findIndex(x => x.id === m.id);
-  const next = view[i + 1] || view[i - 1];
+  const next = i >= 0 ? (view[i + 1] || view[i - 1]) : (view[curIdx] || view[curIdx - 1]);
+  // עוברים לבא לפני המחיקה, כדי שהצפייה לא תיסגר
+  if (next && next.id !== m.id) showMeme(next.id);
   try {
     await deleteDoc(doc(db, "memes", m.id));
     toast("המם נמחק");
-    if (next) showMeme(next.id); else $("vClose").click();
-  } catch { toast("המחיקה נכשלה", true); }
+    if (!next || next.id === m.id) $("vClose").click();
+  } catch {
+    toast("המחיקה נכשלה", true);
+    if (byId(m.id)) showMeme(m.id);
+  }
 };
 
 // ---------------------------------------------------------------------
