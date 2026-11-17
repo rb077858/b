@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#0d9488">
+  <meta name="theme-color" content="#1d1b16">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="תורנויות">
@@ -14,8 +14,8 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=Secular+One&display=swap">
+  <link rel="stylesheet" href="style.css?v=9">
   <script>
     try { document.documentElement.dataset.theme = localStorage.getItem("ch-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) {}
   </script>
@@ -25,7 +25,7 @@
 
   <section id="login" class="login hidden">
     <div class="login-card">
-      <div class="logo">🧹</div>
+      <div class="logo">ת</div>
       <h1>תורנויות חדר</h1>
       <p id="loginText">הסידור היומי של החדר: מיטות, שולחן, טאטוא, תורנות קומה ומטבחון</p>
       <div id="joinBox" class="hidden"></div>
@@ -39,7 +39,7 @@
     <header class="hdr">
       <div class="hdr-in">
         <div class="brand"><div class="dot" id="roomDot"></div><div class="grow"><b>תורנויות חדר</b><span id="hdrSub"></span></div></div>
-        <button class="icon-btn" id="themeBtn" title="מצב כהה/בהיר">🌓</button>
+        <button class="icon-btn" id="themeBtn" title="מצב כהה/בהיר"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v16a8 8 0 0 0 0-16z" fill="currentColor"/></svg></button>
         <button class="icon-btn" id="meBtn" title="החשבון שלי"></button>
       </div>
     </header>
@@ -47,6 +47,6 @@
     <nav class="tabs"><div class="tabs-in" id="tabs"></div></nav>
   </div>
 
-  <script type="module" src="app.js?v=7"></script>
+  <script type="module" src="app.js?v=9"></script>
 </body>
 </html>

@@ -5,18 +5,18 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, ADMIN_EMAIL, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, GOOGLE_SVG
-} from "../common.js?v=7";
-import * as C from "../core.js?v=7";
+} from "../common.js?v=9";
+import * as C from "../core.js?v=9";
 
 const { doc, collection, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } = FS;
 
 const isMgr = m => (m.role || "manager") === "manager";
 const TABS = [
-  { id: "people", label: "אנשים", ic: "👥" },
-  { id: "rooms", label: "חדרים", ic: "🚪" },
-  { id: "duty", label: "תורנויות", ic: "📋" },
-  { id: "sug", label: "הצעות", ic: "💡" },
-  { id: "settings", label: "הגדרות", ic: "⚙️" }
+  { id: "people", label: "אנשים", ic: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.2 5 2.6 5 5.8"/></svg>' },
+  { id: "rooms", label: "חדרים", ic: '<svg viewBox="0 0 24 24"><path d="M5 21V4h11v17M3 21h18M13 12h.01"/></svg>' },
+  { id: "duty", label: "תורנויות", ic: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="1"/><path d="M9 4V3h6v1M8.5 10l1.5 1.5L13 8.5M8.5 15.5l1.5 1.5 3-3"/></svg>' },
+  { id: "sug", label: "הצעות", ic: '<svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></svg>' },
+  { id: "settings", label: "הגדרות", ic: '<svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>' }
 ];
 const S = { sugs: [], user: null, members: [], rooms: {}, duties: [], events: [], settings: C.mergeSettings(), settingsRaw: null, tab: "people", filter: "", unsubs: [], editing: null };
 
@@ -79,7 +79,7 @@ function vPeople() {
     ${list.length ? `<table class="tbl"><thead><tr><th>חדר</th><th>שם</th><th>מייל</th><th class="hide-sm">תפקיד</th><th></th></tr></thead><tbody>
     ${list.map(m => {
       return `<tr><td><span class="room-n" style="font-size:.95rem">${esc(m.room)}</span></td><td>${esc(m.name || "—")}${m.id === emailKey(ADMIN_EMAIL) ? ` <span class="chip me">אני</span>` : ""}</td><td class="ltr small" style="text-align:right">${esc(m.email)}</td><td class="hide-sm"><span class="chip ${isMgr(m) ? "ok" : ""}">${isMgr(m) ? "אחראי" : "דייר"}</span></td>
-        <td style="white-space:nowrap"><button class="more-btn" data-act="edit" data-id="${esc(m.id)}" title="עריכה">✏️</button></td></tr>`;
+        <td style="white-space:nowrap"><button class="more-btn" data-act="edit" data-id="${esc(m.id)}" title="עריכה">עריכה</button></td></tr>`;
     }).join("")}</tbody></table>` : `<div class="empty">עוד אין אף אחד</div>`}</div>`;
   return h;
 }
@@ -128,7 +128,7 @@ function editSheet(id) {
 function vRooms() {
   const t0 = C.dateKey();
   const ids = [...new Set([...S.members.map(m => String(m.room)), ...Object.keys(S.rooms)])].sort((a, b) => (+a || 0) - (+b || 0));
-  if (!ids.length) return `<div class="card empty"><div class="big">🚪</div>עוד אין חדרים. צרפו אנשים בלשונית "אנשים".</div>`;
+  if (!ids.length) return `<div class="card empty"><div class="big"></div>עוד אין חדרים. צרפו אנשים בלשונית "אנשים".</div>`;
   const d = C.dutyFor(S.duties, t0);
   return ids.map(id => {
     const r = S.rooms[id] || {};
@@ -138,7 +138,7 @@ function vRooms() {
     const away = res.filter(x => C.absenceOn(r.absences, x.id, t0));
     const roles = C.roomRoles(d, id);
     return `<div class="card"><div class="card-hd"><span class="room-n">${esc(id)}</span><h3 class="grow">${m ? esc(m.name || m.email) : `<span class="muted">אין חשבון משויך</span>`}</h3>
-      ${r.independent ? `<span class="chip warn">🔌 עצמאי</span>` : ""}${roles.floor ? `<span class="chip floor">🏢 קומה</span>` : ""}${roles.kitchen ? `<span class="chip kitchen">🍳 מטבחון</span>` : ""}</div>
+      ${r.independent ? `<span class="chip warn"> עצמאי</span>` : ""}${roles.floor ? `<span class="chip floor"> קומה</span>` : ""}${roles.kitchen ? `<span class="chip kitchen"> מטבחון</span>` : ""}</div>
       <div class="small muted" style="margin:-4px 0 8px">${res.length} דיירים · ${accounts} הצטרפו בקישור</div>
       <div class="chips">${res.map(x => `<span class="chip ${away.includes(x) ? "warn" : ""}">${esc(x.name)}${away.includes(x) ? " · " + C.reasonOf(C.absenceOn(r.absences, x.id, t0)).name : ""}</span>`).join("") || `<span class="muted small">החדר עוד לא הוסיף דיירים</span>`}</div></div>`;
   }).join("");
@@ -147,9 +147,9 @@ function vRooms() {
 // ---------- תורנויות וחריגים ----------
 function vDuty() {
   let h = `<div class="card"><div class="card-hd"><h2>תורנויות שהוזנו</h2><span class="chip">${S.duties.length}</span></div>
-    ${S.duties.length ? `<div class="list">${S.duties.map(x => `<div class="li"><span class="emo">📋</span><div class="tx"><b>${C.DAY_NAMES[C.weekday(x.date)]} ${C.fmtDate(x.date)}</b><span>קומה: ${(x.floor || []).join(", ") || "—"} · מטבחון: ${(x.kitchen || []).join(", ") || "—"}${x.byRoom ? ` · ע"י חדר ${esc(x.byRoom)}` : ""}</span></div><button class="more-btn" data-act="deld" data-id="${esc(x.id)}" title="מחיקה">🗑</button></div>`).join("")}</div>` : `<div class="muted small">אין עדיין</div>`}</div>`;
+    ${S.duties.length ? `<div class="list">${S.duties.map(x => `<div class="li"><span class="emo"></span><div class="tx"><b>${C.DAY_NAMES[C.weekday(x.date)]} ${C.fmtDate(x.date)}</b><span>קומה: ${(x.floor || []).join(", ") || "—"} · מטבחון: ${(x.kitchen || []).join(", ") || "—"}${x.byRoom ? ` · ע"י חדר ${esc(x.byRoom)}` : ""}</span></div><button class="more-btn" data-act="deld" data-id="${esc(x.id)}" title="מחיקה">✕</button></div>`).join("")}</div>` : `<div class="muted small">אין עדיין</div>`}</div>`;
   h += `<div class="card"><div class="card-hd"><h2>שינויים בלו"ז לכל הפנימייה</h2><span class="chip">${S.events.length}</span></div>
-    ${S.events.length ? `<div class="list">${S.events.map(e => `<div class="li"><span class="emo">${(C.EVENT_TYPES[e.type] || {}).icon || "📌"}</span><div class="tx"><b>${esc(e.title || (C.EVENT_TYPES[e.type] || {}).name || e.type)}</b><span>${C.fmtDate(e.from)}${e.to && e.to !== e.from ? (e.type === "mopmove" ? " ← " : " – ") + C.fmtDate(e.to) : ""}${e.byRoom ? ` · חדר ${esc(e.byRoom)}` : ""}</span></div><button class="more-btn" data-act="dele" data-id="${esc(e.id)}" title="מחיקה">🗑</button></div>`).join("")}</div>` : `<div class="muted small">אין. החדרים מוסיפים חופשות וטיולים מלשונית "השבוע" באתר.</div>`}</div>`;
+    ${S.events.length ? `<div class="list">${S.events.map(e => `<div class="li"><span class="emo">${(C.EVENT_TYPES[e.type] || {}).icon || ""}</span><div class="tx"><b>${esc(e.title || (C.EVENT_TYPES[e.type] || {}).name || e.type)}</b><span>${C.fmtDate(e.from)}${e.to && e.to !== e.from ? (e.type === "mopmove" ? " ← " : " – ") + C.fmtDate(e.to) : ""}${e.byRoom ? ` · חדר ${esc(e.byRoom)}` : ""}</span></div><button class="more-btn" data-act="dele" data-id="${esc(e.id)}" title="מחיקה">✕</button></div>`).join("")}</div>` : `<div class="muted small">אין. החדרים מוסיפים חופשות וטיולים מלשונית "השבוע" באתר.</div>`}</div>`;
   return h;
 }
 
@@ -167,10 +167,10 @@ function curValue(kind) {
 }
 function vSug() {
   const open = S.sugs.filter(x => x.status === "open"), rest = S.sugs.filter(x => x.status !== "open");
-  const row = x => `<div class="li" style="align-items:flex-start"><span class="emo">💡</span><div class="tx"><b>חדר ${esc(x.room)} · ${SUG_KINDS[x.kind] || ""}${sugValue(x) ? ": " + esc(sugValue(x)) : ""}</b>
+  const row = x => `<div class="li" style="align-items:flex-start"><span class="emo"></span><div class="tx"><b>חדר ${esc(x.room)} · ${SUG_KINDS[x.kind] || ""}${sugValue(x) ? ": " + esc(sugValue(x)) : ""}</b>
       <span>${x.kind !== "other" ? `כרגע: ${esc(curValue(x.kind))} · ` : ""}${esc(x.text || "")}${x.byName ? " · " + esc(x.byName) : ""}${x.reply ? " · תשובה: " + esc(x.reply) : ""}</span></div>
       ${x.status === "open" ? `<div class="row" style="flex-wrap:wrap;justify-content:flex-end">${x.kind !== "other" ? `<button class="btn sm pri" data-act="sugok" data-id="${x.id}">אישור והחלה</button>` : `<button class="btn sm pri" data-act="sugdone" data-id="${x.id}">טופל</button>`}<button class="btn sm danger" data-act="sugno" data-id="${x.id}">דחייה</button></div>`
-        : `<span class="chip ${x.status === "approved" ? "ok" : "bad"}">${x.status === "approved" ? "אושר" : "נדחה"}</span><button class="more-btn" data-act="sugdel" data-id="${x.id}" title="מחיקה">🗑</button>`}</div>`;
+        : `<span class="chip ${x.status === "approved" ? "ok" : "bad"}">${x.status === "approved" ? "אושר" : "נדחה"}</span><button class="more-btn" data-act="sugdel" data-id="${x.id}" title="מחיקה">✕</button>`}</div>`;
   return `<div class="card"><div class="card-hd"><h2>הצעות ממתינות</h2><span class="chip">${open.length}</span></div>
     ${open.length ? `<div class="list">${open.map(row).join("")}</div>` : `<div class="muted small">אין הצעות חדשות. חדרים יכולים להציע שינוי בהגדרות מלשונית "עוד" באתר.</div>`}</div>
     ${rest.length ? `<div class="card"><h2>טופלו</h2><div class="list">${rest.slice(0, 30).map(row).join("")}</div></div>` : ""}`;

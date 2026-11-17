@@ -8,17 +8,17 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, colorOf, initials, GOOGLE_SVG
-} from "./common.js?v=7";
-import * as C from "./core.js?v=7";
+} from "./common.js?v=9";
+import * as C from "./core.js?v=9";
 
 const { doc, collection, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, runTransaction, writeBatch, serverTimestamp, deleteField, arrayUnion, arrayRemove } = FS;
 
 const TABS = [
-  { id: "today", label: "היום", ic: "☀️" },
-  { id: "week", label: "השבוע", ic: "📅" },
-  { id: "duty", label: "תורנות", ic: "📋" },
-  { id: "room", label: "החדר", ic: "👥" },
-  { id: "more", label: "עוד", ic: "⚙️" }
+  { id: "today", label: "היום", ic: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>' },
+  { id: "week", label: "השבוע", ic: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4M7 14h2M11 14h2M15 14h2M7 17h2M11 17h2"/></svg>' },
+  { id: "duty", label: "תורנות", ic: '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="1"/><path d="M9 4V3h6v1M8.5 10l1.5 1.5L13 8.5M8.5 15.5l1.5 1.5 3-3"/></svg>' },
+  { id: "room", label: "החדר", ic: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.2 5 2.6 5 5.8"/></svg>' },
+  { id: "more", label: "עוד", ic: '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>' }
 ];
 
 const S = {
@@ -107,7 +107,7 @@ async function showJoin(token) {
   if (inv.used) { clearJoin(); return showLogin("הקישור הזה כבר שומש. בקשו מאחראי החדר קישור חדש.", true); }
   $("loginText").textContent = "";
   $("joinBox").classList.remove("hidden");
-  $("joinBox").innerHTML = `<div class="status on" style="justify-content:center;margin:0 0 14px">🚪 חדר ${esc(inv.room)}</div>
+  $("joinBox").innerHTML = `<div class="status on" style="justify-content:center;margin:0 0 14px"> חדר ${esc(inv.room)}</div>
     <p style="margin:0 0 14px">הוזמנת להצטרף בתור <b>${esc(inv.name)}</b>.<br><span class="muted small ltr">${esc(S.user.email)}</span></p>
     <button class="btn pri block" id="joinBtn">הצטרפות לחדר</button>`;
   $("joinBtn").onclick = async () => {
@@ -120,7 +120,7 @@ async function showJoin(token) {
       clearJoin();
       $("joinBox").classList.add("hidden");
       await start(S.user);
-      toast(`ברוך הבא לחדר ${inv.room}! 👋`);
+      toast(`ברוך הבא לחדר ${inv.room}! `);
     } catch (e) { $("joinBtn").disabled = false; $("loginErr").textContent = authError(e); }
   };
 }
@@ -133,12 +133,12 @@ function showRoomJoin(token, inv) {
   $("loginText").textContent = "";
   $("joinBox").classList.remove("hidden");
   if (!free.length) {
-    $("joinBox").innerHTML = `<div class="status on" style="justify-content:center;margin:0 0 14px">🚪 חדר ${esc(inv.room)}</div><p>כל השמות ברשימה כבר תפוסים. בקשו מאחראי החדר להוסיף אתכם.</p>`;
+    $("joinBox").innerHTML = `<div class="status on" style="justify-content:center;margin:0 0 14px"> חדר ${esc(inv.room)}</div><p>כל השמות ברשימה כבר תפוסים. בקשו מאחראי החדר להוסיף אתכם.</p>`;
     return;
   }
-  $("joinBox").innerHTML = `<div class="status on" style="justify-content:center;margin:0 0 10px">🚪 הצטרפות לחדר ${esc(inv.room)}</div>
+  $("joinBox").innerHTML = `<div class="status on" style="justify-content:center;margin:0 0 10px"> הצטרפות לחדר ${esc(inv.room)}</div>
     <p style="margin:0 0 10px">מי אתה?<br><span class="muted small ltr">${esc(S.user.email)}</span></p>
-    <div style="text-align:start;margin-bottom:12px">${free.map(r => `<button class="opt" data-rid="${esc(r)}"><span class="emo">👤</span><span class="tx">${esc((inv.names || {})[r] || "?")}</span></button>`).join("")}</div>`;
+    <div style="text-align:start;margin-bottom:12px">${free.map(r => `<button class="opt" data-rid="${esc(r)}"><span class="emo"></span><span class="tx">${esc((inv.names || {})[r] || "?")}</span></button>`).join("")}</div>`;
   $("joinBox").querySelectorAll("[data-rid]").forEach(btn => btn.onclick = async () => {
     const rid = btn.dataset.rid, name = (inv.names || {})[rid] || "";
     if (!(await confirmSheet(`להצטרף בתור ${name}?`, `לחדר ${inv.room}. אפשר לבחור רק פעם אחת.`, "כן, זה אני"))) return;
@@ -150,7 +150,7 @@ function showRoomJoin(token, inv) {
       clearJoin();
       $("joinBox").classList.add("hidden");
       await start(S.user);
-      toast(`ברוך הבא לחדר ${inv.room}, ${name}! 👋`);
+      toast(`ברוך הבא לחדר ${inv.room}, ${name}! `);
     } catch (e) {
       $("loginErr").textContent = e.code === "permission-denied" ? "השם הזה כבר נתפס או שהקישור בוטל. רעננו ונסו שוב." : authError(e);
     }
@@ -162,7 +162,7 @@ function enter(m) {
   $("login").classList.add("hidden"); $("app").classList.remove("hidden");
   $("roomDot").textContent = S.room;
   $("hdrSub").textContent = `חדר ${S.room}${m.name ? " · " + m.name : ""}${isManager() ? " · אחראי" : ""}`;
-  $("meBtn").innerHTML = S.user.photoURL ? `<img src="${esc(S.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : "👤";
+  $("meBtn").innerHTML = S.user.photoURL ? `<img src="${esc(S.user.photoURL)}" alt="" referrerpolicy="no-referrer">` : `<svg viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/></svg>`;
   subscribe();
   render();
 }
@@ -274,15 +274,15 @@ const roleChips = key => {
   const info = C.dayInfo(key, S.room, S.settings, events());
   const roles = C.roomRoles(C.dutyFor(S.duties, key), S.room);
   const ch = [];
-  if (!info.active) ch.push(`<span class="chip">${info.off ? "🏖️ " + esc(info.off.title || "חופשה") : "😴 אין משימות"}</span>`);
-  if (info.active && info.duty && roles.floor) ch.push(`<span class="chip floor">🏢 תורנות קומה</span>`);
-  if (info.active && info.duty && roles.kitchen) ch.push(`<span class="chip kitchen">🍳 מטבחון ומועדון</span>`);
-  if (info.mop) ch.push(`<span class="chip mop">🪣 יום שטיפה</span>`);
+  if (!info.active) ch.push(`<span class="chip">${info.off ? " " + esc(info.off.title || "חופשה") : " אין משימות"}</span>`);
+  if (info.active && info.duty && roles.floor) ch.push(`<span class="chip floor"> תורנות קומה</span>`);
+  if (info.active && info.duty && roles.kitchen) ch.push(`<span class="chip kitchen"> מטבחון ומועדון</span>`);
+  if (info.mop) ch.push(`<span class="chip mop"> יום שטיפה</span>`);
   for (const e of info.events) if (e.type === "note" || (e.type !== "off" && e.title)) ch.push(`<span class="chip">${C.EVENT_TYPES[e.type].icon} ${esc(e.title || C.EVENT_TYPES[e.type].short)}</span>`);
   return ch.join("");
 };
 const absText = ab => `${C.reasonOf(ab).icon} ${C.reasonOf(ab).name}${ab.to ? ` עד ${C.fmtDate(ab.to)}` : " · עד הודעה חדשה"}${ab.note ? " · " + esc(ab.note) : ""}`;
-const modeBanner = () => independent() ? `<div class="status warn" style="margin:0 0 14px">🔌 <span class="grow">החדר במצב עצמאי - לא מחובר למאגר המשותף</span></div>` : "";
+const modeBanner = () => independent() ? `<div class="status warn" style="margin:0 0 14px"> <span class="grow">החדר במצב עצמאי - לא מחובר למאגר המשותף</span></div>` : "";
 
 // ---------- היום ----------
 function vToday() {
@@ -307,15 +307,15 @@ function vToday() {
 
   if (key === t0 && info.active && isManager() && dutyStale()) {
     const d = C.dutyFor(S.duties, t0);
-    h += `<div class="status warn" style="margin:-4px 0 14px">⏰ <span class="grow">${d ? `התורנות עודכנה לפני ${C.daysBetween(d.date, t0)} ימים. יש הודעה חדשה מהמדריך?` : "עוד לא הוזנה תורנות קומה/מטבחון."}</span><button class="btn sm" data-act="paste">הדבקה</button></div>`;
+    h += `<div class="status warn" style="margin:-4px 0 14px"> <span class="grow">${d ? `התורנות עודכנה לפני ${C.daysBetween(d.date, t0)} ימים. יש הודעה חדשה מהמדריך?` : "עוד לא הוזנה תורנות קומה/מטבחון."}</span><button class="btn sm" data-act="paste">הדבקה</button></div>`;
   }
   if (!act.length) {
     return h + (isManager()
-      ? `<div class="card empty"><div class="big">👋</div><b>ברוכים הבאים לחדר ${esc(S.room)}!</b><p>קודם כל, הוסיפו את כל מי שגר בחדר.</p><button class="btn pri" data-act="go" data-tab="room">הוספת אנשים</button></div>`
-      : `<div class="card empty"><div class="big">⏳</div>אחראי החדר עוד לא הוסיף דיירים.</div>`);
+      ? `<div class="card empty"><div class="big"></div><b>ברוכים הבאים לחדר ${esc(S.room)}!</b><p>קודם כל, הוסיפו את כל מי שגר בחדר.</p><button class="btn pri" data-act="go" data-tab="room">הוספת אנשים</button></div>`
+      : `<div class="card empty"><div class="big"></div>אחראי החדר עוד לא הוסיף דיירים.</div>`);
   }
   if (!info.active) {
-    h += `<div class="card empty"><div class="big">${info.off ? "🏖️" : C.weekday(key) === 6 ? "🕯️" : "😴"}</div><b>${info.off ? esc(info.off.title || "חופשה") : C.weekday(key) === 6 ? "שבת שלום!" : "אין משימות היום"}</b><p class="small">אין סידור ניקיון ביום הזה.</p></div>`;
+    h += `<div class="card empty"><div class="big">${info.off ? "" : C.weekday(key) === 6 ? "" : ""}</div><b>${info.off ? esc(info.off.title || "חופשה") : C.weekday(key) === 6 ? "שבת שלום!" : "אין משימות היום"}</b><p class="small">אין סידור ניקיון ביום הזה.</p></div>`;
   }
   if (!plan) return h + `<div class="card empty">אין נתונים שמורים ליום הזה.</div>`;
 
@@ -327,7 +327,7 @@ function vToday() {
       ...mine.map(t => ({ k: t, t, ic: C.TASKS[t].icon, name: C.TASKS[t].name, sub: C.GROUPS[C.TASKS[t].group].name + (plan.manual && plan.manual[t] ? " · הוחלף" : ""), g: C.TASKS[t].group }))];
     const allDone = rows.every(x => done[x.k]);
     h += `<div class="card person" ${isMe ? `style="border-color:var(--a)"` : ""}>
-      <div class="person-hd">${avatar(r)}<div class="nm"><b>${esc(r.name)}${isMe ? ` <span class="chip me" style="font-size:.7rem;padding:1px 8px">אני</span>` : ""}${allDone ? " ✨" : ""}</b><span>${mine.length ? `${mine.length} משימות + מיטה` : "רק המיטה היום"}</span></div>
+      <div class="person-hd">${avatar(r)}<div class="nm"><b>${esc(r.name)}${isMe ? ` <span class="chip me" style="font-size:.8rem;padding:1px 8px">אני</span>` : ""}${allDone ? ` <span class="chip ok" style="font-size:.72rem;padding:0 7px">סיים</span>` : ""}</b><span>${mine.length ? `${mine.length} משימות + מיטה` : "רק המיטה היום"}</span></div>
         ${!isPast && canEditPerson(r.id) ? `<button class="more-btn" data-act="person" data-id="${r.id}" aria-label="אפשרויות">⋯</button>` : ""}</div>
       <ul class="tasks">${rows.map(x => `<li class="task g-${x.g} ${x.t ? "t-" + x.t : ""} ${done[x.k] ? "done" : ""}">
         <span class="ic">${x.ic}</span><div class="tx"><b>${esc(x.name)}</b><span>${esc(x.sub)}</span></div>
@@ -345,7 +345,7 @@ function vToday() {
         ${ab && !isPast && canEditPerson(r.id) ? `<button class="btn sm" data-act="back" data-id="${r.id}">חזר ✓</button>` : ""}</div></div>`;
     }
   }
-  if (info.active && away.length) h += `<div class="status off small" style="margin:4px 0 12px">🛏️ <span class="grow">${away.map(r => esc(r.name)).join(", ")} לא בחדר - לדאוג שהמיטה ${away.length > 1 ? "שלהם" : "שלו"} מסודרת. מי שיושב עליה בהמשך - מסדר.</span></div>`;
+  if (info.active && away.length) h += `<div class="status off small" style="margin:4px 0 12px"> <span class="grow">${away.map(r => esc(r.name)).join(", ")} לא בחדר - לדאוג שהמיטה ${away.length > 1 ? "שלהם" : "שלו"} מסודרת. מי שיושב עליה בהמשך - מסדר.</span></div>`;
   if (info.active && !isPast) h += `<p class="muted small center">${isManager() ? "⇄ מעביר משימה למישהו אחר · ⋯ ליד שם: חולה / נסע הביתה / החלפה" : "מסמנים ✓ על מה שעשית · ⋯ ליד השם שלך: חולה / נסע הביתה"}</p>`;
   return h;
 }
@@ -368,7 +368,7 @@ function vWeek() {
     if (info.active && p.tasks.length) {
       h += `<div class="wgrid">${p.present.map(id => {
         const ts = C.tasksOf(p, id);
-        return `<div class="wrow"><span class="n" ${id === me ? `style="color:var(--a)"` : ""}>${esc(nameOf(id))}</span><span class="t">${ts.length ? ts.map(t => C.TASKS[t].icon + " " + C.TASKS[t].name).join(" · ") : "🛏️ רק מיטה"}</span></div>`;
+        return `<div class="wrow"><span class="n" ${id === me ? `style="color:var(--a)"` : ""}>${esc(nameOf(id))}</span><span class="t">${ts.length ? ts.map(t => C.TASKS[t].icon + " " + C.TASKS[t].name).join(" · ") : " רק מיטה"}</span></div>`;
       }).join("")}</div>`;
     }
     if (awayIds.length) h += `<div class="small muted" style="margin-top:6px">לא בחדר: ${awayIds.map(r => { const a = C.absenceOn(absences(), r.id, p.date); return esc(r.name) + (a ? " " + C.reasonOf(a).icon : ""); }).join(", ")}</div>`;
@@ -385,7 +385,7 @@ function vWeek() {
   if (!up.length) h += `<div class="muted small">אין שינויים.${isManager() ? " אפשר להוסיף חופשה, טיול, העברת יום שטיפה ועוד." : ""}</div>`;
   else h += `<div class="list">${up.map(e => `<div class="li" ${e.ignored ? `style="opacity:.55"` : ""}><span class="emo">${C.EVENT_TYPES[e.type].icon}</span><div class="tx"><b>${esc(e.title || C.EVENT_TYPES[e.type].name)}${e.ignored ? " · לא חל עלינו" : ""}</b><span>${eventRange(e)} · ${e.room ? "רק החדר שלנו" : `משותף${e.byRoom ? ` (חדר ${esc(e.byRoom)})` : ""}`}</span></div>
       ${isManager() && !e.room ? `<button class="btn sm" data-act="ignore" data-id="${esc(e.id)}" data-v="${e.ignored ? 0 : 1}">${e.ignored ? "להחיל" : "לא חל עלינו"}</button>` : ""}
-      ${canDeleteEvent(e) ? `<button class="more-btn" data-act="delevent" data-id="${esc(e.id)}" data-scope="${e.room ? "room" : "all"}" aria-label="מחיקה">🗑</button>` : ""}</div>`).join("")}</div>`;
+      ${canDeleteEvent(e) ? `<button class="more-btn" data-act="delevent" data-id="${esc(e.id)}" data-scope="${e.room ? "room" : "all"}" aria-label="מחיקה">✕</button>` : ""}</div>`).join("")}</div>`;
   h += `</div>`;
   return h;
 }
@@ -407,23 +407,23 @@ function vDuty() {
   const roles = C.roomRoles(d, S.room);
   const roomsHtml = l => (l || []).length ? `<div class="rooms">${l.map(n => `<span class="room-n ${String(n) === S.room ? "me" : ""}">${esc(n)}</span>`).join("")}</div>` : `<span class="muted small">—</span>`;
   let h = modeBanner() + `<div class="card"><div class="card-hd"><h2>התורנות הנוכחית</h2>${d ? `<span class="chip">מ-${C.DAY_NAMES[C.weekday(d.date)]} ${C.fmtDate(d.date)}</span>` : ""}</div>`;
-  if (!d) h += `<div class="empty"><div class="big">📭</div>עוד לא הוזנה תורנות.${isManager() ? " הדביקו את ההודעה של המדריך." : ""}</div>`;
+  if (!d) h += `<div class="empty"><div class="big"></div>עוד לא הוזנה תורנות.${isManager() ? " הדביקו את ההודעה של המדריך." : ""}</div>`;
   else {
-    h += `<div class="duty-grid"><div class="duty-box"><h4>🏢 תורנות קומה</h4>${roomsHtml(d.floor)}</div><div class="duty-box"><h4>🍳 מטבחון, מועדון${S.settings.outside ? " ומחוץ לפנימייה" : ""}</h4>${roomsHtml(d.kitchen)}</div></div>`;
+    h += `<div class="duty-grid"><div class="duty-box"><h4> תורנות קומה</h4>${roomsHtml(d.floor)}</div><div class="duty-box"><h4> מטבחון, מועדון${S.settings.outside ? " ומחוץ לפנימייה" : ""}</h4>${roomsHtml(d.kitchen)}</div></div>`;
     h += roles.floor || roles.kitchen
-      ? `<div class="status on">⭐ החדר שלכם ב${[roles.floor && "תורנות קומה", roles.kitchen && "מטבחון ומועדון"].filter(Boolean).join(" וגם ב")}</div>`
-      : `<div class="status off">😌 החדר שלכם לא בתורנות כרגע</div>`;
+      ? `<div class="status on"> החדר שלכם ב${[roles.floor && "תורנות קומה", roles.kitchen && "מטבחון ומועדון"].filter(Boolean).join(" וגם ב")}</div>`
+      : `<div class="status off"> החדר שלכם לא בתורנות כרגע</div>`;
     const age = C.daysBetween(d.date, t0);
-    if (age >= S.settings.staleDays) h += `<div class="status warn">⏰ עברו ${age} ימים מהעדכון - בדרך כלל מתחלף כל 3 ימים</div>`;
-    h += `<div class="small muted" style="margin-top:10px">${d.local ? "🚪 הוזן ע\"י החדר שלכם - חל רק עליכם" : `🏫 מהמאגר המשותף${d.byRoom ? ` · עודכן ע"י חדר ${esc(d.byRoom)}` : ""}`}${d.sender ? ` · מתוך ההודעה של ${esc(d.sender)}${d.time ? " ב-" + esc(d.time) : ""}` : ""}${d.newRound ? " · סבב חדש" : ""}</div>`;
+    if (age >= S.settings.staleDays) h += `<div class="status warn"> עברו ${age} ימים מהעדכון - בדרך כלל מתחלף כל 3 ימים</div>`;
+    h += `<div class="small muted" style="margin-top:10px">${d.local ? " הוזן ע\"י החדר שלכם - חל רק עליכם" : ` מהמאגר המשותף${d.byRoom ? ` · עודכן ע"י חדר ${esc(d.byRoom)}` : ""}`}${d.sender ? ` · מתוך ההודעה של ${esc(d.sender)}${d.time ? " ב-" + esc(d.time) : ""}` : ""}${d.newRound ? " · סבב חדש" : ""}</div>`;
   }
-  if (isManager()) h += `<div class="btns"><button class="btn pri grow" data-act="paste">📋 הדבקת הודעה מהמדריך</button><button class="btn" data-act="manual">✏️ עריכה / החלפה</button></div>`;
+  if (isManager()) h += `<div class="btns"><button class="btn pri grow" data-act="paste"> הדבקת הודעה מהמדריך</button><button class="btn" data-act="manual">עריכה / החלפה</button></div>`;
   h += `</div>`;
   if (S.duties.length) {
     h += `<div class="sec-title">היסטוריה</div><div class="card"><div class="list">${S.duties.slice(0, 15).map(x => {
       const r = C.roomRoles(x, S.room);
-      return `<div class="li"><span class="emo">${r.floor ? "🏢" : r.kitchen ? "🍳" : "📋"}</span><div class="tx"><b>${C.DAY_NAMES[C.weekday(x.date)]} ${C.fmtDate(x.date)}${x.local ? " · שלנו בלבד" : ""}</b><span>קומה: ${(x.floor || []).join(", ") || "—"} · מטבחון: ${(x.kitchen || []).join(", ") || "—"}</span></div>
-        ${r.floor || r.kitchen ? `<span class="chip me">אנחנו</span>` : ""}${x.local && isManager() ? `<button class="more-btn" data-act="dellocal" data-id="${x.date}" aria-label="מחיקה">🗑</button>` : ""}</div>`;
+      return `<div class="li"><span class="emo">${r.floor ? "" : r.kitchen ? "" : ""}</span><div class="tx"><b>${C.DAY_NAMES[C.weekday(x.date)]} ${C.fmtDate(x.date)}${x.local ? " · שלנו בלבד" : ""}</b><span>קומה: ${(x.floor || []).join(", ") || "—"} · מטבחון: ${(x.kitchen || []).join(", ") || "—"}</span></div>
+        ${r.floor || r.kitchen ? `<span class="chip me">אנחנו</span>` : ""}${x.local && isManager() ? `<button class="more-btn" data-act="dellocal" data-id="${x.date}" aria-label="מחיקה">✕</button>` : ""}</div>`;
     }).join("")}</div></div>`;
   }
   return h;
@@ -463,12 +463,12 @@ function vRoom() {
       else if (mgr) acc = memberOf(r.id) ? `<span class="chip ok">מחובר ✓</span>` : inviteOf(r.id) ? `<span class="chip warn">הוזמן</span>` : "";
       if (r.id === me) acc = `<span class="chip me">אני</span>`;
       return `<div class="li">${avatar(r, 36)}<div class="tx"><b>${esc(r.name)}</b><span>${ab ? absText(ab) : "בחדר"}</span></div>${acc}
-        ${mgr && r.id !== me ? `<button class="btn sm" data-act="invite" data-id="${r.id}" title="קישור אישי">🔗</button>` : ""}
+        ${mgr && r.id !== me ? `<button class="btn sm" data-act="invite" data-id="${r.id}" title="קישור אישי">${memberOf(r.id) ? "חשבון" : "קישור"}</button>` : ""}
         ${mgr ? `<button class="more-btn" data-act="resident" data-id="${r.id}" aria-label="עריכה">⋯</button>` : ""}</div>`;
     }).join("") || `<div class="muted small">עוד אין אף אחד.${mgr ? " הוסיפו את כל מי שגר בחדר." : ""}</div>`}</div>
     ${mgr ? `<form class="row" style="margin-top:12px" data-form="addres"><input class="inp grow" name="name" placeholder="שם של מישהו בחדר" maxlength="30" autocomplete="off"><button class="btn pri">הוספה</button></form>
-      <p class="muted small" style="margin-bottom:0">🔗 שולחים לכל אחד קישור אישי. הוא נכנס עם Google, רואה את הלו"ז ומסמן רק את מה ששלו.</p>` : ""}
-    ${mgr ? `<div class="status ${roomLink() ? "on" : "off"}" style="margin-top:12px">👥 <span class="grow">${roomLink() ? `קישור לכל החדר פעיל · ${Object.keys(roomLink().taken || {}).length} הצטרפו דרכו` : "קישור אחד לכל החדר: כל אחד נכנס ובוחר מי הוא"}</span><button class="btn sm" data-act="roomlink">${roomLink() ? "הצגה" : "יצירה"}</button></div>` : ""}
+      <p class="muted small" style="margin-bottom:0"> שולחים לכל אחד קישור אישי. הוא נכנס עם Google, רואה את הלו"ז ומסמן רק את מה ששלו.</p>` : ""}
+    ${mgr ? `<div class="status ${roomLink() ? "on" : "off"}" style="margin-top:12px"> <span class="grow">${roomLink() ? `קישור לכל החדר פעיל · ${Object.keys(roomLink().taken || {}).length} הצטרפו דרכו` : "קישור אחד לכל החדר: כל אחד נכנס ובוחר מי הוא"}</span><button class="btn sm" data-act="roomlink">${roomLink() ? "הצגה" : "יצירה"}</button></div>` : ""}
     ${mgr && !me && act.length ? `<div class="status warn">מי מהרשימה זה אתה? <button class="btn sm" data-act="whoami">לבחור</button></div>` : ""}
   </div>`;
 
@@ -479,14 +479,14 @@ function vRoom() {
       const cur = a.from <= t0 && (!a.to || a.to >= t0), fut = a.from > t0;
       return `<div class="li"><span class="emo">${C.reasonOf(a).icon}</span><div class="tx"><b>${esc(nameOf(a.rid))} · ${C.reasonOf(a).name}</b><span>${C.fmtDate(a.from)}${a.to ? (a.to !== a.from ? " – " + C.fmtDate(a.to) : "") : " · עד הודעה חדשה"}${a.note ? " · " + esc(a.note) : ""}</span></div>
         ${cur ? `<span class="chip warn">עכשיו</span>` : fut ? `<span class="chip">בקרוב</span>` : `<span class="chip ok">הסתיים</span>`}
-        ${canEditPerson(a.rid) && (!a.legacy || mgr) ? `<button class="more-btn" data-act="delabs" data-id="${a.id}" aria-label="מחיקה">🗑</button>` : ""}</div>`;
+        ${canEditPerson(a.rid) && (!a.legacy || mgr) ? `<button class="more-btn" data-act="delabs" data-id="${a.id}" aria-label="מחיקה">✕</button>` : ""}</div>`;
     }).join("")}</div>` : `<div class="muted small">אין היעדרויות. מישהו חולה או נסע הביתה? סמנו כאן והמשימות שלו יחולקו לאחרים.</div>`}
     ${mgr || me ? `<div class="btns"><button class="btn" data-act="absence">＋ סימון היעדרות</button></div>` : ""}</div>`;
 
   // מאגר משותף
   h += `<div class="sec-title">מאגר משותף</div><div class="card">
     ${mgr ? `<label class="switch"><div class="tx"><b>מחוברים למאגר המשותף</b><span>תורנויות וחופשות שחדרים אחרים מזינים מתעדכנים גם אצלכם (אפשר תמיד להזין אחרת רק לחדר)</span></div><input type="checkbox" data-room="shared" ${independent() ? "" : "checked"}></label>`
-      : `<div class="status ${independent() ? "warn" : "on"}" style="margin:0">${independent() ? "🔌 החדר במצב עצמאי" : "🏫 החדר מחובר למאגר המשותף"}</div>`}
+      : `<div class="status ${independent() ? "warn" : "on"}" style="margin:0">${independent() ? " החדר במצב עצמאי" : " החדר מחובר למאגר המשותף"}</div>`}
     ${independent() && mgr ? ownSettingsHtml() : ""}
     ${!independent() ? `<div class="small muted" style="margin-top:8px">ימי ניקיון: ${S.settings.activeDays.map(i => C.DAY_NAMES[i]).join(", ")} · שטיפה: ${S.settings.mopDay >= 0 ? "יום " + C.DAY_NAMES[S.settings.mopDay] : "אין"}. רק המנהל משנה - אפשר להציע לו שינוי בלשונית "עוד".</div>` : ""}
   </div>`;
@@ -512,7 +512,7 @@ function ownSettingsHtml() {
 
 // ---------- עוד ----------
 const SUG_KINDS = { activeDays: "ימי ניקיון", mopDay: "יום השטיפה", outside: "\"מחוץ לפנימייה\"", other: "אחר" };
-const STATUS = { open: ["⏳ ממתין", ""], approved: ["✓ אושר", "ok"], rejected: ["✕ נדחה", "bad"] };
+const STATUS = { open: [" ממתין", ""], approved: ["✓ אושר", "ok"], rejected: ["✕ נדחה", "bad"] };
 function sugValue(s) {
   if (s.kind === "activeDays") return (s.value || []).map(i => C.DAY_NAMES[i]).join(", ");
   if (s.kind === "mopDay") return s.value >= 0 ? "יום " + C.DAY_NAMES[s.value] : "בלי שטיפה";
@@ -523,18 +523,18 @@ function vMore() {
   const u = S.user;
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
   let h = `<div class="card"><div class="list">
-    <div class="li"><span class="emo">👤</span><div class="tx"><b>${esc(u.displayName || S.member.name || "")}</b><span class="ltr">${esc(u.email)}</span></div><span class="chip">${isManager() ? "אחראי" : "דייר"} · חדר ${esc(S.room)}</span></div>
-    <button class="opt" data-act="theme"><span class="emo">🌓</span><span class="tx">מצב כהה / בהיר</span></button>
-    ${!standalone ? `<button class="opt" data-act="install"><span class="emo">📲</span><span class="tx">התקנה כאפליקציה<span>להוסיף את האתר למסך הבית</span></span></button>` : ""}
-    <button class="opt" data-act="help"><span class="emo">❓</span><span class="tx">איך זה עובד</span></button>
-    ${isAdminUser(u) ? `<a class="opt" href="admin/" style="text-decoration:none;color:inherit"><span class="emo">🛠️</span><span class="tx">ממשק ניהול</span></a>` : ""}
-    <button class="opt" data-act="logout"><span class="emo">🚪</span><span class="tx" style="color:var(--bad)">התנתקות</span></button>
+    <div class="li"><span class="emo"></span><div class="tx"><b>${esc(u.displayName || S.member.name || "")}</b><span class="ltr">${esc(u.email)}</span></div><span class="chip">${isManager() ? "אחראי" : "דייר"} · חדר ${esc(S.room)}</span></div>
+    <button class="opt" data-act="theme"><span class="emo"></span><span class="tx">מצב כהה / בהיר</span></button>
+    ${!standalone ? `<button class="opt" data-act="install"><span class="emo"></span><span class="tx">התקנה כאפליקציה<span>להוסיף את האתר למסך הבית</span></span></button>` : ""}
+    <button class="opt" data-act="help"><span class="emo"></span><span class="tx">איך זה עובד</span></button>
+    ${isAdminUser(u) ? `<a class="opt" href="admin/" style="text-decoration:none;color:inherit"><span class="emo"></span><span class="tx">ממשק ניהול</span></a>` : ""}
+    <button class="opt" data-act="logout"><span class="emo"></span><span class="tx" style="color:var(--bad)">התנתקות</span></button>
   </div></div>`;
-  h += `<div class="card"><div class="card-hd"><h2>💡 הצעה למנהל</h2></div>
+  h += `<div class="card"><div class="card-hd"><h2> הצעה למנהל</h2></div>
     <p class="muted small" style="margin-top:0">ימי הניקיון, יום השטיפה ושאר ההגדרות המשותפות נקבעים ע"י המנהל. יש רעיון לשינוי? שלחו לו הצעה.</p>
     <button class="btn block" data-act="suggest">שליחת הצעה</button>
-    ${S.suggestions.length ? `<div class="list" style="margin-top:8px">${S.suggestions.slice(0, 10).map(s => `<div class="li"><span class="emo">💡</span><div class="tx"><b>${SUG_KINDS[s.kind] || ""}${sugValue(s) ? ": " + esc(sugValue(s)) : ""}</b><span>${esc(s.text || "")}${s.byName ? " · " + esc(s.byName) : ""}${s.reply ? ` · תשובה: ${esc(s.reply)}` : ""}</span></div><span class="chip ${STATUS[s.status][1]}">${STATUS[s.status][0]}</span>
-      ${s.status === "open" && s.by === myEmail() ? `<button class="more-btn" data-act="delsug" data-id="${s.id}" aria-label="מחיקה">🗑</button>` : ""}</div>`).join("")}</div>` : ""}
+    ${S.suggestions.length ? `<div class="list" style="margin-top:8px">${S.suggestions.slice(0, 10).map(s => `<div class="li"><span class="emo"></span><div class="tx"><b>${SUG_KINDS[s.kind] || ""}${sugValue(s) ? ": " + esc(sugValue(s)) : ""}</b><span>${esc(s.text || "")}${s.byName ? " · " + esc(s.byName) : ""}${s.reply ? ` · תשובה: ${esc(s.reply)}` : ""}</span></div><span class="chip ${STATUS[s.status][1]}">${STATUS[s.status][0]}</span>
+      ${s.status === "open" && s.by === myEmail() ? `<button class="more-btn" data-act="delsug" data-id="${s.id}" aria-label="מחיקה">✕</button>` : ""}</div>`).join("")}</div>` : ""}
   </div>`;
   return h;
 }
@@ -585,7 +585,7 @@ $("view").addEventListener("submit", async e => {
     if (active().some(r => r.name === name)) return toast("כבר יש מישהו בשם הזה");
     f.name.value = "";
     await saveResidents([...residents(), { id: C.uid(), name, since: today() }]).catch(fail);
-    toast(`${name} נוסף לחדר. אפשר לשלוח לו קישור אישי 🔗`);
+    toast(`${name} נוסף לחדר. אפשר לשלוח לו קישור אישי `);
   }
 });
 $("view").addEventListener("change", async e => {
@@ -598,7 +598,7 @@ $("view").addEventListener("change", async e => {
       const patch = { independent: ind };
       if (ind && !(S.roomDoc && S.roomDoc.ownSettings)) patch.ownSettings = Object.fromEntries(C.SETTING_KEYS.map(x => [x, S.settings[x]]));
       await updateDoc(roomRef(), patch);
-      toast(ind ? "החדר במצב עצמאי 🔌" : "חזרתם למאגר המשותף 🏫");
+      toast(ind ? "החדר במצב עצמאי " : "חזרתם למאגר המשותף ");
     } else if (k === "outside") await updateDoc(roomRef(), { "ownSettings.outside": e.target.checked });
   } catch (err) { fail(err); }
 });
@@ -652,14 +652,14 @@ function personSheet(id) {
   const r = residents().find(x => x.id === id);
   const others = isManager() ? plan.present.filter(x => x !== id) : [];
   sheet(`<div class="row" style="margin-bottom:12px">${avatar(r)}<div><h2>${esc(r.name)}</h2><div class="sub" style="margin:0">${esc(C.fmtDay(key))}</div></div></div>
-    <button class="opt" data-act="abs" data-r="sick"><span class="emo">🤒</span><span class="tx">חולה<span>המשימות יחולקו לאחרים</span></span></button>
-    <button class="opt" data-act="abs" data-r="home"><span class="emo">🏠</span><span class="tx">נסע הביתה</span></button>
-    <button class="opt" data-act="abs" data-r="other"><span class="emo">📝</span><span class="tx">אחר</span></button>
-    ${others.length ? `<button class="opt" data-act="swap"><span class="emo">🔄</span><span class="tx">החלפת תורנות עם מישהו<span>מתחלפים בכל המשימות של היום</span></span></button>` : ""}`,
+    <button class="opt" data-act="abs" data-r="sick"><span class="emo"></span><span class="tx">חולה<span>המשימות יחולקו לאחרים</span></span></button>
+    <button class="opt" data-act="abs" data-r="home"><span class="emo"></span><span class="tx">נסע הביתה</span></button>
+    <button class="opt" data-act="abs" data-r="other"><span class="emo"></span><span class="tx">אחר</span></button>
+    ${others.length ? `<button class="opt" data-act="swap"><span class="emo"></span><span class="tx">החלפת תורנות עם מישהו<span>מתחלפים בכל המשימות של היום</span></span></button>` : ""}`,
   (act, el, root, close) => {
     if (act === "abs") { close(); absenceSheet(id, el.dataset.r, key); }
     if (act === "swap") {
-      root.innerHTML = `<div class="grip"></div><h2>🔄 ${esc(r.name)} מתחלף עם...</h2><div class="sub">כל המשימות של היום מתחלפות ביניהם</div>
+      root.innerHTML = `<div class="grip"></div><h2> ${esc(r.name)} מתחלף עם...</h2><div class="sub">כל המשימות של היום מתחלפות ביניהם</div>
         ${others.map(o => { const p = residents().find(x => x.id === o); return `<button class="opt" data-act="swapwith" data-id="${o}">${avatar(p, 36)}<span class="tx">${esc(p.name)}<span>${C.tasksOf(plan, o).map(taskName).join(", ") || "רק מיטה"}</span></span></button>`; }).join("")}`;
     }
     if (act === "swapwith") {
@@ -703,7 +703,7 @@ function absenceSheet(rid, reason = "sick", from = today()) {
     close();
     try {
       await addDoc(absCol(), { rid: st.rid, reason: st.reason, from: st.from, to, note, by: myEmail(), at: Date.now() });
-      toast(`${nameOf(st.rid)} סומן: ${C.reasonOf(st).name}. המשימות חולקו מחדש\n🛏️ לדאוג עכשיו שהמיטה שלו מסודרת`, 5000);
+      toast(`${nameOf(st.rid)} סומן: ${C.reasonOf(st).name}. המשימות חולקו מחדש\n לדאוג עכשיו שהמיטה שלו מסודרת`, 5000);
     } catch (e) { fail(e); }
   });
   draw(s.root);
@@ -718,7 +718,7 @@ async function endAbsence(rid) {
   if (isManager() && legacyAbs().some(cur)) {
     await updateDoc(roomRef(), { absences: legacyAbs().map(a => !cur(a) ? a : a.from >= t0 ? null : { ...a, to: C.addDays(t0, -1) }).filter(Boolean).map(({ legacy, ...a }) => a) });
   }
-  toast(`${nameOf(rid)} חזר לחדר 👋`);
+  toast(`${nameOf(rid)} חזר לחדר `);
 }
 async function delAbsence(id) {
   if (!(await confirmSheet("למחוק את ההיעדרות?", "החלוקה של הימים הבאים תחושב מחדש", "מחיקה", true))) return;
@@ -734,9 +734,9 @@ function residentSheet(id) {
   sheet(`<h2>${esc(r.name)}</h2><div class="sub">דייר בחדר ${esc(S.room)}</div>
     <label class="field"><span>שם</span><input class="inp" id="rsName" value="${esc(r.name)}" maxlength="30"></label>
     <div class="btns"><button class="btn pri grow" data-act="save">שמירה</button></div>
-    <button class="opt" data-act="abs"><span class="emo">🤒</span><span class="tx">סימון היעדרות / מחלה</span></button>
-    ${r.id !== myRid() ? `<button class="opt" data-act="inv"><span class="emo">🔗</span><span class="tx">קישור אישי להצטרפות</span></button>` : ""}
-    ${r.id !== myRid() ? `<button class="opt" data-act="left"><span class="emo">👋</span><span class="tx" style="color:var(--bad)">עזב את החדר<span>לא יקבל משימות והגישה שלו תבוטל. ההיסטוריה נשמרת</span></span></button>` : ""}`,
+    <button class="opt" data-act="abs"><span class="emo"></span><span class="tx">סימון היעדרות / מחלה</span></button>
+    ${r.id !== myRid() ? `<button class="opt" data-act="inv"><span class="emo"></span><span class="tx">קישור אישי להצטרפות</span></button>` : ""}
+    ${r.id !== myRid() ? `<button class="opt" data-act="left"><span class="emo"></span><span class="tx" style="color:var(--bad)">עזב את החדר<span>לא יקבל משימות והגישה שלו תבוטל. ההיסטוריה נשמרת</span></span></button>` : ""}`,
   async (act, el, root, close) => {
     try {
       if (act === "save") {
@@ -782,9 +782,9 @@ async function roomLinkSheet(fresh = false) {
     l = { id: token, taken: {} };
   }
   const link = new URL(`./?join=${l.id}`, location.href).href;
-  const msg = `הקישור להצטרפות לתורנויות של חדר ${S.room} 🧹\nנכנסים עם Google ובוחרים מי אתם מהרשימה:\n${link}`;
+  const msg = `הקישור להצטרפות לתורנויות של חדר ${S.room} \nנכנסים עם Google ובוחרים מי אתם מהרשימה:\n${link}`;
   const waiting = joinableResidents();
-  sheet(`<h2>👥 קישור לכל החדר</h2><div class="sub">שולחים לקבוצה של החדר. כל אחד נכנס עם Google, בוחר את השם שלו מהרשימה ומצטרף. כל שם אפשר לבחור פעם אחת.</div>
+  sheet(`<h2> קישור לכל החדר</h2><div class="sub">שולחים לקבוצה של החדר. כל אחד נכנס עם Google, בוחר את השם שלו מהרשימה ומצטרף. כל שם אפשר לבחור פעם אחת.</div>
     <input class="inp ltr" id="rlLink" value="${esc(link)}" readonly onclick="this.select()">
     <div class="btns">
       <a class="btn pri grow" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="text-decoration:none">שליחה בוואטסאפ</a>
@@ -792,7 +792,7 @@ async function roomLinkSheet(fresh = false) {
       ${navigator.share ? `<button class="btn" data-act="share">שיתוף</button>` : ""}
     </div>
     <div class="small muted" style="margin:12px 0 4px">${waiting.length ? `עוד לא הצטרפו: ${waiting.map(r => esc(r.name)).join(", ")}` : "כולם כבר מחוברים ✓"}</div>
-    <div class="btns"><button class="btn grow" data-act="renew">🔄 קישור חדש</button><button class="btn danger grow" data-act="off">ביטול הקישור</button></div>
+    <div class="btns"><button class="btn grow" data-act="renew"> קישור חדש</button><button class="btn danger grow" data-act="off">ביטול הקישור</button></div>
     <div class="small muted" style="margin-top:8px">קישור חדש מבטל את הקודם (מי שכבר הצטרף נשאר מחובר).</div>`,
   async (act, el, root, close) => {
     try {
@@ -828,7 +828,7 @@ async function inviteSheet(rid) {
   }
   const link = new URL(`./?join=${inv.id}`, location.href).href;
   const msg = `היי ${r.name}! זה הקישור האישי שלך לתורנויות של חדר ${S.room}: ${link}`;
-  sheet(`<h2>🔗 קישור אישי ל${esc(r.name)}</h2><div class="sub">שולחים לו את הקישור. הוא נכנס עם Google ומצטרף לחדר. הקישור עובד פעם אחת.</div>
+  sheet(`<h2> קישור אישי ל${esc(r.name)}</h2><div class="sub">שולחים לו את הקישור. הוא נכנס עם Google ומצטרף לחדר. הקישור עובד פעם אחת.</div>
     <input class="inp ltr" id="invLink" value="${esc(link)}" readonly onclick="this.select()">
     <div class="btns">
       <a class="btn pri grow" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="text-decoration:none">שליחה בוואטסאפ</a>
@@ -861,8 +861,8 @@ function eventSheet() {
       ${mm && S.settings.mopDay >= 0 ? `<div class="small muted" style="margin:-6px 0 12px">יום השטיפה הקבוע הוא יום ${C.DAY_NAMES[S.settings.mopDay]}. הקרוב: ${C.fmtDate(nextWeekday(S.settings.mopDay))}</div>` : ""}
       <label class="field"><span>תיאור (לא חובה)</span><input class="inp" id="evTitle" maxlength="60" value="${esc(st.title)}" placeholder="למשל: טיול שנתי">
         ${titles[st.type] ? `<div class="chips" style="margin-top:6px">${titles[st.type].map(x => `<button class="chip" data-act="title" data-v="${esc(x)}">${esc(x)}</button>`).join("")}</div>` : ""}</label>
-      ${independent() ? `<div class="status warn" style="margin:0 0 12px">🔌 מצב עצמאי - השינוי יחול רק על החדר שלכם</div>`
-        : `<div class="field"><span>למי זה?</span><div class="seg"><button data-act="scope" data-v="all" class="${st.scope === "all" ? "on" : ""}">🏫 כל הפנימייה (משותף)</button><button data-act="scope" data-v="room" class="${st.scope === "room" ? "on" : ""}">🚪 רק החדר שלנו</button></div></div>`}
+      ${independent() ? `<div class="status warn" style="margin:0 0 12px"> מצב עצמאי - השינוי יחול רק על החדר שלכם</div>`
+        : `<div class="field"><span>למי זה?</span><div class="seg"><button data-act="scope" data-v="all" class="${st.scope === "all" ? "on" : ""}"> כל הפנימייה (משותף)</button><button data-act="scope" data-v="room" class="${st.scope === "room" ? "on" : ""}"> רק החדר שלנו</button></div></div>`}
       <div class="btns"><button class="btn pri grow" data-act="save">שמירה</button><button class="btn" data-act="close">ביטול</button></div>`;
   };
   const read = root => { st.from = root.querySelector("#evFrom").value; st.to = root.querySelector("#evTo").value; st.title = root.querySelector("#evTitle").value; };
@@ -898,9 +898,9 @@ async function delEvent(id, scope) {
 
 // ---------- הדבקת תורנות (אחראי) ----------
 function pasteSheet() {
-  sheet(`<h2>📋 הדבקת הודעה מהמדריך</h2><div class="sub">מעתיקים מהקבוצה את ההודעה (או כמה הודעות יחד) ומדביקים כאן. המערכת תזהה את החדרים.</div>
+  sheet(`<h2> הדבקת הודעה מהמדריך</h2><div class="sub">מעתיקים מהקבוצה את ההודעה (או כמה הודעות יחד) ומדביקים כאן. המערכת תזהה את החדרים.</div>
     <textarea class="inp" id="pasteTx" placeholder="[17/11, 7:56] נדב המדריך: בוקר טוב!&#10;חדרים תורנים:&#10;37&#10;41&#10;45&#10;&#10;מטבחון מועדון ומחוץ לפנימיה: 39" autofocus></textarea>
-    <div class="btns">${navigator.clipboard && navigator.clipboard.readText ? `<button class="btn" data-act="clip">📥 הדבקה מהלוח</button>` : ""}<button class="btn pri grow" data-act="parse">זיהוי</button></div>`,
+    <div class="btns">${navigator.clipboard && navigator.clipboard.readText ? `<button class="btn" data-act="clip"> הדבקה מהלוח</button>` : ""}<button class="btn pri grow" data-act="parse">זיהוי</button></div>`,
   async (act, el, root) => {
     const tx = root.querySelector("#pasteTx");
     if (act === "clip") { try { tx.value = await navigator.clipboard.readText(); } catch (e) { toast("אין גישה ללוח. הדביקו ידנית (לחיצה ארוכה ← הדבקה)"); } }
@@ -920,11 +920,11 @@ function dutyEditor(msgs) {
       ${list.map((m, i) => `<div class="card" style="box-shadow:none;background:var(--panel-2)">
         <div class="row"><label class="field grow" style="margin-bottom:8px"><span>בתוקף מתאריך</span><input class="inp" type="date" data-i="${i}" data-f="date" value="${m.date}"></label>
           ${list.length > 1 ? `<button class="more-btn" data-act="rm" data-i="${i}" aria-label="הסרה">✕</button>` : ""}</div>
-        <label class="field"><span>🏢 תורנות קומה</span><input class="inp ltr" inputmode="numeric" data-i="${i}" data-f="floor" value="${esc(m.floor)}" placeholder="37, 41, 45"></label>
-        <label class="field" style="margin-bottom:0"><span>🍳 מטבחון ומועדון</span><input class="inp ltr" inputmode="numeric" data-i="${i}" data-f="kitchen" value="${esc(m.kitchen)}" placeholder="39"></label>
+        <label class="field"><span> תורנות קומה</span><input class="inp ltr" inputmode="numeric" data-i="${i}" data-f="floor" value="${esc(m.floor)}" placeholder="37, 41, 45"></label>
+        <label class="field" style="margin-bottom:0"><span> מטבחון ומועדון</span><input class="inp ltr" inputmode="numeric" data-i="${i}" data-f="kitchen" value="${esc(m.kitchen)}" placeholder="39"></label>
       </div>`).join("")}
-      ${independent() ? `<div class="status warn" style="margin:0 0 4px">🔌 מצב עצמאי - נשמר רק לחדר שלכם</div>`
-        : `<div class="field"><span>למי לשמור?</span><div class="seg"><button data-act="scope" data-v="all" class="${scope === "all" ? "on" : ""}">🏫 לכל הפנימייה</button><button data-act="scope" data-v="room" class="${scope === "room" ? "on" : ""}">🚪 רק לחדר שלנו</button></div></div>`}
+      ${independent() ? `<div class="status warn" style="margin:0 0 4px"> מצב עצמאי - נשמר רק לחדר שלכם</div>`
+        : `<div class="field"><span>למי לשמור?</span><div class="seg"><button data-act="scope" data-v="all" class="${scope === "all" ? "on" : ""}"> לכל הפנימייה</button><button data-act="scope" data-v="room" class="${scope === "room" ? "on" : ""}"> רק לחדר שלנו</button></div></div>`}
       <div class="btns"><button class="btn pri grow" data-act="save">שמירה</button><button class="btn" data-act="close">ביטול</button></div>`;
   };
   const read = root => root.querySelectorAll("[data-f]").forEach(inp => { list[+inp.dataset.i][inp.dataset.f] = inp.value; });
@@ -945,7 +945,7 @@ function dutyEditor(msgs) {
         else await setDoc(doc(db, "ch_rooms", S.room, "duties", m.date), data);
       }
       const r = C.roomRoles(C.dutyFor([...S.duties, ...out], today()), S.room);
-      toast(r.floor || r.kitchen ? `נשמר! החדר שלכם ב${r.floor ? "תורנות קומה" : "מטבחון ומועדון"} 💪` : "נשמר! החדר שלכם לא בתורנות 😌", 3500);
+      toast(r.floor || r.kitchen ? `נשמר! החדר שלכם ב${r.floor ? "תורנות קומה" : "מטבחון ומועדון"} ` : "נשמר! החדר שלכם לא בתורנות ", 3500);
     } catch (e) { fail(e); }
   });
   draw(s.root);
@@ -955,7 +955,7 @@ function dutyEditor(msgs) {
 function notifyDutyChange(prev) {
   const t0 = today();
   const before = C.roomRoles(C.dutyFor(prev, t0), S.room), now = C.roomRoles(C.dutyFor(S.duties, t0), S.room);
-  if ((now.floor && !before.floor) || (now.kitchen && !before.kitchen)) toast(`📋 חדר ${S.room} נכנס ל${now.floor ? "תורנות קומה" : "מטבחון ומועדון"}`, 4000);
+  if ((now.floor && !before.floor) || (now.kitchen && !before.kitchen)) toast(` חדר ${S.room} נכנס ל${now.floor ? "תורנות קומה" : "מטבחון ומועדון"}`, 4000);
 }
 
 // ---------- הצעה למנהל ----------
@@ -963,7 +963,7 @@ function suggestSheet() {
   const cur = S.settings;
   const st = { kind: "mopDay", days: [...cur.activeDays], mop: cur.mopDay, outside: !cur.outside };
   const draw = root => {
-    root.innerHTML = `<div class="grip"></div><h2>💡 הצעה למנהל</h2><div class="sub">המנהל יראה את ההצעה ויוכל לאשר אותה בלחיצה</div>
+    root.innerHTML = `<div class="grip"></div><h2> הצעה למנהל</h2><div class="sub">המנהל יראה את ההצעה ויוכל לאשר אותה בלחיצה</div>
       <div class="field"><span>מה לשנות?</span><div class="seg">${Object.entries(SUG_KINDS).map(([k, v]) => `<button data-act="kind" data-v="${k}" class="${st.kind === k ? "on" : ""}">${v}</button>`).join("")}</div></div>
       ${st.kind === "activeDays" ? `<div class="field"><span>ימים עם ניקיון</span><div class="seg">${C.DAY_NAMES.map((n, i) => `<button data-act="d" data-v="${i}" class="${st.days.includes(i) ? "on" : ""}">${n}</button>`).join("")}</div></div>` : ""}
       ${st.kind === "mopDay" ? `<div class="field"><span>יום שטיפה</span><div class="seg">${C.DAY_NAMES.map((n, i) => `<button data-act="m" data-v="${i}" class="${st.mop === i ? "on" : ""}">${n}</button>`).join("")}<button data-act="m" data-v="-1" class="${st.mop < 0 ? "on" : ""}">אין</button></div></div>` : ""}
@@ -984,7 +984,7 @@ function suggestSheet() {
     close();
     try {
       await addDoc(collection(db, "ch_suggestions"), { room: S.room, by: myEmail(), byName: S.member.name || S.user.displayName || "", kind: st.kind, value, text: text.trim().slice(0, 300), status: "open", at: Date.now() });
-      toast("ההצעה נשלחה למנהל 💡");
+      toast("ההצעה נשלחה למנהל ");
     } catch (e) { fail(e); }
   });
   draw(s.root);
@@ -994,22 +994,22 @@ function suggestSheet() {
 //  עזרה
 // =====================================================================
 function installHelp() {
-  sheet(`<h2>📲 התקנה כאפליקציה</h2>
-    <div class="list"><div class="li"><span class="emo">🍎</span><div class="tx"><b>אייפון</b><span>בספארי: כפתור השיתוף ⬆️ ← "הוספה למסך הבית"</span></div></div>
-    <div class="li"><span class="emo">🤖</span><div class="tx"><b>אנדרואיד</b><span>בכרום: תפריט ⋮ ← "התקנת אפליקציה" / "הוספה למסך הבית"</span></div></div></div>
+  sheet(`<h2> התקנה כאפליקציה</h2>
+    <div class="list"><div class="li"><span class="emo"></span><div class="tx"><b>אייפון</b><span>בספארי: כפתור השיתוף  ← "הוספה למסך הבית"</span></div></div>
+    <div class="li"><span class="emo"></span><div class="tx"><b>אנדרואיד</b><span>בכרום: תפריט ⋮ ← "התקנת אפליקציה" / "הוספה למסך הבית"</span></div></div></div>
     <div class="btns"><button class="btn block" data-act="close">הבנתי</button></div>`);
 }
 function helpSheet() {
-  sheet(`<h2>❓ איך זה עובד</h2>
+  sheet(`<h2>איך זה עובד</h2>
     <div class="list">
-      <div class="li"><span class="emo">☀️</span><div class="tx"><b>כל בוקר חלוקה חדשה</b><span>כל אחד מסדר את המיטה שלו. פינוי שולחן וטאטוא מתחלקים, ובחמישי גם שטיפה.</span></div></div>
-      <div class="li"><span class="emo">👥</span><div class="tx"><b>אחראי ודיירים</b><span>אחראי החדר מוסיף את הדיירים ושולח לכל אחד קישור אישי. דייר רואה את הלו"ז ומסמן את מה ששלו.</span></div></div>
-      <div class="li"><span class="emo">📋</span><div class="tx"><b>תורנות קומה ומטבחון</b><span>מדביקים את ההודעה של המדריך בלשונית "תורנות". מספיק שחדר אחד ידביק, וזה מתעדכן לכולם. אפשר גם להזין אחרת רק לחדר.</span></div></div>
-      <div class="li"><span class="emo">🤒</span><div class="tx"><b>מישהו חולה / נסע הביתה</b><span>⋯ ליד השם. המשימות שלו עוברות לאחרים, ומה שכבר בוצע נשאר.</span></div></div>
+      <div class="li"><span class="emo"></span><div class="tx"><b>כל בוקר חלוקה חדשה</b><span>כל אחד מסדר את המיטה שלו. פינוי שולחן וטאטוא מתחלקים, ובחמישי גם שטיפה.</span></div></div>
+      <div class="li"><span class="emo"></span><div class="tx"><b>אחראי ודיירים</b><span>אחראי החדר מוסיף את הדיירים ושולח לכל אחד קישור אישי. דייר רואה את הלו"ז ומסמן את מה ששלו.</span></div></div>
+      <div class="li"><span class="emo"></span><div class="tx"><b>תורנות קומה ומטבחון</b><span>מדביקים את ההודעה של המדריך בלשונית "תורנות". מספיק שחדר אחד ידביק, וזה מתעדכן לכולם. אפשר גם להזין אחרת רק לחדר.</span></div></div>
+      <div class="li"><span class="emo"></span><div class="tx"><b>מישהו חולה / נסע הביתה</b><span>⋯ ליד השם. המשימות שלו עוברות לאחרים, ומה שכבר בוצע נשאר.</span></div></div>
       <div class="li"><span class="emo">⇄</span><div class="tx"><b>החלפות</b><span>האחראי מעביר משימה (⇄) או מחליף בין שניים את כל המשימות (⋯ ← החלפת תורנות).</span></div></div>
-      <div class="li"><span class="emo">🏖️</span><div class="tx"><b>חופשות, טיולים ושינויים</b><span>בלשונית "השבוע". משותף לכל הפנימייה או רק לחדר, ואפשר לסמן שינוי משותף "לא חל עלינו".</span></div></div>
-      <div class="li"><span class="emo">🔌</span><div class="tx"><b>מצב עצמאי</b><span>בלשונית "החדר" אפשר לצאת מהמאגר המשותף ולנהל הכל לבד, כולל ימי ניקיון ויום שטיפה.</span></div></div>
-      <div class="li"><span class="emo">⚖️</span><div class="tx"><b>הוגנות</b><span>מי שעשה פחות לאורך זמן מקבל קודם. נספר רק מה שסומן ✓ - לכן חשוב לסמן! שטיפה ושירותים נחשבים יותר משולחן.</span></div></div>
+      <div class="li"><span class="emo"></span><div class="tx"><b>חופשות, טיולים ושינויים</b><span>בלשונית "השבוע". משותף לכל הפנימייה או רק לחדר, ואפשר לסמן שינוי משותף "לא חל עלינו".</span></div></div>
+      <div class="li"><span class="emo"></span><div class="tx"><b>מצב עצמאי</b><span>בלשונית "החדר" אפשר לצאת מהמאגר המשותף ולנהל הכל לבד, כולל ימי ניקיון ויום שטיפה.</span></div></div>
+      <div class="li"><span class="emo"></span><div class="tx"><b>הוגנות</b><span>מי שעשה פחות לאורך זמן מקבל קודם. נספר רק מה שסומן ✓ - לכן חשוב לסמן! שטיפה ושירותים נחשבים יותר משולחן.</span></div></div>
     </div><div class="btns"><button class="btn block" data-act="close">סגירה</button></div>`);
 }
 

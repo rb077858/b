@@ -11,29 +11,29 @@ export const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "�
 
 // w = משקל (כמה המשימה "שווה"), כדי שהחלוקה תהיה הוגנת גם כשהמשימות לא שוות
 export const TASKS = {
-  table:    { name: "פינוי השולחן",          icon: "🍽️", w: 1, group: "room" },
-  sweep:    { name: "טאטוא החדר",            icon: "🧹", w: 2, group: "room" },
-  trash:    { name: "פינוי הפח של החדר",     icon: "🗑️", w: 1, group: "room" },
-  mop:      { name: "שטיפת החדר",            icon: "🪣", w: 3, group: "room" },
-  hall:     { name: "טאטוא המסדרון",         icon: "🧹", w: 2, group: "floor" },
-  restroom: { name: "שטיפת השירותים",        icon: "🚿", w: 3, group: "floor" },
-  sinks:    { name: "ניקוי הכיורים",         icon: "🚰", w: 1, group: "floor" },
-  toilets:  { name: "ניקוי האסלות",          icon: "🚽", w: 2, group: "floor" },
-  bins:     { name: "פינוי כל הפחים בקומה לפח הגדול בחוץ", icon: "♻️", w: 2, group: "floor" },
-  kitchen:  { name: "ניקוי המטבחון",         icon: "🍳", w: 2, group: "kitchen" },
-  club:     { name: "ניקוי המועדון",         icon: "🛋️", w: 2, group: "kitchen" },
-  outside:  { name: "ניקיון מחוץ לפנימייה",  icon: "🌳", w: 2, group: "kitchen" }
+  table:    { name: "פינוי השולחן",          icon: "", w: 1, group: "room" },
+  sweep:    { name: "טאטוא החדר",            icon: "", w: 2, group: "room" },
+  trash:    { name: "פינוי הפח של החדר",     icon: "", w: 1, group: "room" },
+  mop:      { name: "שטיפת החדר",            icon: "", w: 3, group: "room" },
+  hall:     { name: "טאטוא המסדרון",         icon: "", w: 2, group: "floor" },
+  restroom: { name: "שטיפת השירותים",        icon: "", w: 3, group: "floor" },
+  sinks:    { name: "ניקוי הכיורים",         icon: "", w: 1, group: "floor" },
+  toilets:  { name: "ניקוי האסלות",          icon: "", w: 2, group: "floor" },
+  bins:     { name: "פינוי כל הפחים בקומה לפח הגדול בחוץ", icon: "", w: 2, group: "floor" },
+  kitchen:  { name: "ניקוי המטבחון",         icon: "", w: 2, group: "kitchen" },
+  club:     { name: "ניקוי המועדון",         icon: "", w: 2, group: "kitchen" },
+  outside:  { name: "ניקיון מחוץ לפנימייה",  icon: "", w: 2, group: "kitchen" }
 };
-export const BED = { name: "סידור המיטה", icon: "🛏️" };
+export const BED = { name: "סידור המיטה", icon: "" };
 export const GROUPS = {
-  room:    { name: "ניקיון החדר",        icon: "🏠" },
-  floor:   { name: "תורנות קומה",        icon: "🏢" },
-  kitchen: { name: "מטבחון ומועדון",     icon: "🍳" }
+  room:    { name: "ניקיון החדר",        icon: "" },
+  floor:   { name: "תורנות קומה",        icon: "" },
+  kitchen: { name: "מטבחון ומועדון",     icon: "" }
 };
 export const REASONS = {
-  sick:    { name: "חולה",          icon: "🤒" },
-  home:    { name: "נסע הביתה",     icon: "🏠" },
-  other:   { name: "אחר",           icon: "📝" }
+  sick:    { name: "חולה",          icon: "" },
+  home:    { name: "נסע הביתה",     icon: "" },
+  other:   { name: "אחר",           icon: "" }
 };
 
 // סיבה של היעדרות (כולל ישנות שכבר לא ברשימה)
@@ -189,13 +189,13 @@ export function roomRoles(duty, room) {
 //    note    - הודעה בלבד                                             from..to
 // ---------------------------------------------------------------------
 export const EVENT_TYPES = {
-  off:     { name: "חופשה / טיול - אין משימות", short: "אין משימות", icon: "🏖️" },
-  mopmove: { name: "העברת יום השטיפה",          short: "השטיפה עברה", icon: "🔁" },
-  mop:     { name: "יום שטיפה נוסף",             short: "יום שטיפה", icon: "🪣" },
-  nomop:   { name: "ביטול השטיפה",               short: "בלי שטיפה", icon: "🚫" },
-  noduty:  { name: "בלי תורנות קומה ומטבחון",    short: "בלי תורנות", icon: "⏸️" },
-  on:      { name: "יום רגיל (גם אם בד\"כ אין)",  short: "יום רגיל", icon: "✅" },
-  note:    { name: "הערה / הודעה",               short: "הערה", icon: "📌" }
+  off:     { name: "חופשה / טיול - אין משימות", short: "אין משימות", icon: "" },
+  mopmove: { name: "העברת יום השטיפה",          short: "השטיפה עברה", icon: "" },
+  mop:     { name: "יום שטיפה נוסף",             short: "יום שטיפה", icon: "" },
+  nomop:   { name: "ביטול השטיפה",               short: "בלי שטיפה", icon: "" },
+  noduty:  { name: "בלי תורנות קומה ומטבחון",    short: "בלי תורנות", icon: "" },
+  on:      { name: "יום רגיל (גם אם בד\"כ אין)",  short: "יום רגיל", icon: "" },
+  note:    { name: "הערה / הודעה",               short: "הערה", icon: "" }
 };
 const inRange = (e, key) => e.from <= key && (e.to || e.from) >= key;
 export function eventsOn(events, key, room) {

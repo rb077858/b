@@ -109,7 +109,7 @@ export function confirmSheet(title, text, okLabel = "אישור", danger = false
 }
 
 // צבע קבוע לכל שם
-const COLORS = ["#0d9488", "#6366f1", "#ea580c", "#0284c7", "#db2777", "#7c3aed", "#16a34a", "#ca8a04", "#dc2626", "#0891b2"];
+const COLORS = ["#2b4b8c", "#a35f00", "#2f6a4a", "#8a3557", "#23707f", "#6b4a2a", "#4a3c8c", "#9c3a24", "#3d5a2a", "#5b5040"];
 export function colorOf(id) { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; }
 export const initials = name => String(name || "?").trim().split(/\s+/).map(w => w[0]).slice(0, 2).join("");
 
