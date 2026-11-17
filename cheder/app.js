@@ -8,8 +8,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, colorOf, initials, GOOGLE_SVG
-} from "./common.js?v=6";
-import * as C from "./core.js?v=6";
+} from "./common.js?v=7";
+import * as C from "./core.js?v=7";
 
 const { doc, collection, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, runTransaction, writeBatch, serverTimestamp, deleteField, arrayUnion, arrayRemove } = FS;
 
@@ -103,6 +103,7 @@ async function showJoin(token) {
   let inv = null;
   try { const s = await getDoc(doc(db, "ch_invites", token)); inv = s.exists() ? s.data() : null; } catch (e) { inv = null; }
   if (!inv) { clearJoin(); return showLogin("הקישור לא תקף או שבוטל. בקשו מאחראי החדר קישור חדש.", true); }
+  if (inv.kind === "room") return showRoomJoin(token, inv);
   if (inv.used) { clearJoin(); return showLogin("הקישור הזה כבר שומש. בקשו מאחראי החדר קישור חדש.", true); }
   $("loginText").textContent = "";
   $("joinBox").classList.remove("hidden");
@@ -122,6 +123,38 @@ async function showJoin(token) {
       toast(`ברוך הבא לחדר ${inv.room}! 👋`);
     } catch (e) { $("joinBtn").disabled = false; $("loginErr").textContent = authError(e); }
   };
+}
+
+// קישור לכל החדר: בוחרים מי אתה מתוך הרשימה
+function showRoomJoin(token, inv) {
+  if (!inv.active) { clearJoin(); return showLogin("הקישור לחדר בוטל. בקשו מאחראי החדר קישור חדש.", true); }
+  const taken = inv.taken || {};
+  const free = (inv.rids || []).filter(r => !taken[r]);
+  $("loginText").textContent = "";
+  $("joinBox").classList.remove("hidden");
+  if (!free.length) {
+    $("joinBox").innerHTML = `<div class="status on" style="justify-content:center;margin:0 0 14px">🚪 חדר ${esc(inv.room)}</div><p>כל השמות ברשימה כבר תפוסים. בקשו מאחראי החדר להוסיף אתכם.</p>`;
+    return;
+  }
+  $("joinBox").innerHTML = `<div class="status on" style="justify-content:center;margin:0 0 10px">🚪 הצטרפות לחדר ${esc(inv.room)}</div>
+    <p style="margin:0 0 10px">מי אתה?<br><span class="muted small ltr">${esc(S.user.email)}</span></p>
+    <div style="text-align:start;margin-bottom:12px">${free.map(r => `<button class="opt" data-rid="${esc(r)}"><span class="emo">👤</span><span class="tx">${esc((inv.names || {})[r] || "?")}</span></button>`).join("")}</div>`;
+  $("joinBox").querySelectorAll("[data-rid]").forEach(btn => btn.onclick = async () => {
+    const rid = btn.dataset.rid, name = (inv.names || {})[rid] || "";
+    if (!(await confirmSheet(`להצטרף בתור ${name}?`, `לחדר ${inv.room}. אפשר לבחור רק פעם אחת.`, "כן, זה אני"))) return;
+    try {
+      const b = writeBatch(db);
+      b.set(doc(db, "ch_members", myEmail()), { email: myEmail(), name, room: String(inv.room), role: "resident", rid, invite: token, addedAt: serverTimestamp() });
+      b.update(doc(db, "ch_invites", token), { [`taken.${rid}`]: myEmail() });
+      await b.commit();
+      clearJoin();
+      $("joinBox").classList.add("hidden");
+      await start(S.user);
+      toast(`ברוך הבא לחדר ${inv.room}, ${name}! 👋`);
+    } catch (e) {
+      $("loginErr").textContent = e.code === "permission-denied" ? "השם הזה כבר נתפס או שהקישור בוטל. רעננו ונסו שוב." : authError(e);
+    }
+  });
 }
 
 function enter(m) {
@@ -172,7 +205,7 @@ function changed() {
   if (prevDuties) notifyDutyChange(prevDuties);
   prevDuties = S.duties;
   clearTimeout(ensureTimer);
-  ensureTimer = setTimeout(ensureToday, 400);
+  ensureTimer = setTimeout(() => { ensureToday(); syncRoomLink(); }, 400);
   if (!renderQueued) { renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render(); }); }
 }
 
@@ -397,8 +430,26 @@ function vDuty() {
 }
 
 // ---------- החדר ----------
+const roomLink = () => S.invites.find(i => i.kind === "room" && i.active);
+// מי עוד יכול להצטרף בקישור לחדר: דיירים פעילים שעוד לא מחוברים, בלי האחראי
+function joinableResidents() {
+  const me = myRid();
+  return active().filter(r => r.id !== me && !memberOf(r.id) && !(r.email));
+}
+// שומר את רשימת השמות שבקישור מעודכנת
+let syncingLink = false;
+async function syncRoomLink() {
+  const l = roomLink();
+  if (!l || !isManager() || syncingLink) return;
+  const list = joinableResidents();
+  const rids = list.map(r => r.id), names = Object.fromEntries(list.map(r => [r.id, r.name]));
+  if (JSON.stringify(rids) === JSON.stringify(l.rids || []) && JSON.stringify(names) === JSON.stringify(l.names || {})) return;
+  syncingLink = true;
+  try { await updateDoc(doc(db, "ch_invites", l.id), { rids, names }); } catch (e) { console.warn(e); }
+  syncingLink = false;
+}
 function memberOf(rid) { return S.roomMembers.find(m => m.rid === rid && m.role === "resident"); }
-function inviteOf(rid) { return S.invites.find(i => i.rid === rid && !i.used); }
+function inviteOf(rid) { return S.invites.find(i => i.kind !== "room" && i.rid === rid && !i.used); }
 function vRoom() {
   const t0 = today();
   const act = active();
@@ -417,6 +468,7 @@ function vRoom() {
     }).join("") || `<div class="muted small">עוד אין אף אחד.${mgr ? " הוסיפו את כל מי שגר בחדר." : ""}</div>`}</div>
     ${mgr ? `<form class="row" style="margin-top:12px" data-form="addres"><input class="inp grow" name="name" placeholder="שם של מישהו בחדר" maxlength="30" autocomplete="off"><button class="btn pri">הוספה</button></form>
       <p class="muted small" style="margin-bottom:0">🔗 שולחים לכל אחד קישור אישי. הוא נכנס עם Google, רואה את הלו"ז ומסמן רק את מה ששלו.</p>` : ""}
+    ${mgr ? `<div class="status ${roomLink() ? "on" : "off"}" style="margin-top:12px">👥 <span class="grow">${roomLink() ? `קישור לכל החדר פעיל · ${Object.keys(roomLink().taken || {}).length} הצטרפו דרכו` : "קישור אחד לכל החדר: כל אחד נכנס ובוחר מי הוא"}</span><button class="btn sm" data-act="roomlink">${roomLink() ? "הצגה" : "יצירה"}</button></div>` : ""}
     ${mgr && !me && act.length ? `<div class="status warn">מי מהרשימה זה אתה? <button class="btn sm" data-act="whoami">לבחור</button></div>` : ""}
   </div>`;
 
@@ -511,6 +563,7 @@ $("view").addEventListener("click", async e => {
     else if (a === "ignore") { e.stopPropagation(); await updateDoc(roomRef(), { ignoredEvents: el.dataset.v === "1" ? arrayUnion(el.dataset.id) : arrayRemove(el.dataset.id) }); }
     else if (a === "resident") residentSheet(el.dataset.id);
     else if (a === "invite") await inviteSheet(el.dataset.id);
+    else if (a === "roomlink") await roomLinkSheet();
     else if (a === "whoami") whoAmISheet();
     else if (a === "absence") absenceSheet(isManager() ? null : myRid());
     else if (a === "delabs") await delAbsence(el.dataset.id);
@@ -704,6 +757,8 @@ function residentSheet(id) {
 async function revokeAccess(rid) {
   const m = memberOf(rid);
   if (m) await deleteDoc(doc(db, "ch_members", m.id));
+  // משחררים את השם בקישור לחדר, כדי שאפשר יהיה להצטרף שוב
+  for (const l of S.invites.filter(x => x.kind === "room" && x.taken && x.taken[rid])) await updateDoc(doc(db, "ch_invites", l.id), { [`taken.${rid}`]: deleteField() });
   for (const i of S.invites.filter(x => x.rid === rid && !x.used)) await deleteDoc(doc(db, "ch_invites", i.id));
 }
 function whoAmISheet() {
@@ -713,6 +768,39 @@ function whoAmISheet() {
     if (act !== "me") return;
     close();
     await saveResidents(residents().map(x => x.id === el.dataset.id ? { ...x, email: myEmail() } : (x.email === myEmail() ? { ...x, email: null } : x))).catch(fail);
+  });
+}
+
+// ---------- קישור לכל החדר ----------
+async function roomLinkSheet(fresh = false) {
+  let l = roomLink();
+  if (fresh && l) { await deleteDoc(doc(db, "ch_invites", l.id)); l = null; }
+  if (!l) {
+    const token = newToken();
+    const list = joinableResidents();
+    await setDoc(doc(db, "ch_invites", token), { kind: "room", room: S.room, rids: list.map(r => r.id), names: Object.fromEntries(list.map(r => [r.id, r.name])), taken: {}, active: true, by: myEmail(), at: serverTimestamp() });
+    l = { id: token, taken: {} };
+  }
+  const link = new URL(`./?join=${l.id}`, location.href).href;
+  const msg = `הקישור להצטרפות לתורנויות של חדר ${S.room} 🧹\nנכנסים עם Google ובוחרים מי אתם מהרשימה:\n${link}`;
+  const waiting = joinableResidents();
+  sheet(`<h2>👥 קישור לכל החדר</h2><div class="sub">שולחים לקבוצה של החדר. כל אחד נכנס עם Google, בוחר את השם שלו מהרשימה ומצטרף. כל שם אפשר לבחור פעם אחת.</div>
+    <input class="inp ltr" id="rlLink" value="${esc(link)}" readonly onclick="this.select()">
+    <div class="btns">
+      <a class="btn pri grow" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener" style="text-decoration:none">שליחה בוואטסאפ</a>
+      <button class="btn" data-act="copy">העתקה</button>
+      ${navigator.share ? `<button class="btn" data-act="share">שיתוף</button>` : ""}
+    </div>
+    <div class="small muted" style="margin:12px 0 4px">${waiting.length ? `עוד לא הצטרפו: ${waiting.map(r => esc(r.name)).join(", ")}` : "כולם כבר מחוברים ✓"}</div>
+    <div class="btns"><button class="btn grow" data-act="renew">🔄 קישור חדש</button><button class="btn danger grow" data-act="off">ביטול הקישור</button></div>
+    <div class="small muted" style="margin-top:8px">קישור חדש מבטל את הקודם (מי שכבר הצטרף נשאר מחובר).</div>`,
+  async (act, el, root, close) => {
+    try {
+      if (act === "copy") await navigator.clipboard.writeText(link).then(() => toast("הקישור הועתק"), () => { root.querySelector("#rlLink").select(); toast("סמנו והעתיקו"); });
+      if (act === "share") await navigator.share({ title: "תורנויות חדר", text: msg }).catch(() => {});
+      if (act === "renew") { close(); await roomLinkSheet(true); }
+      if (act === "off") { close(); await deleteDoc(doc(db, "ch_invites", l.id)); toast("הקישור בוטל"); }
+    } catch (e) { fail(e); }
   });
 }
 

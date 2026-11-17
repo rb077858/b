@@ -65,6 +65,27 @@ await no('manager removes manager', deleteDoc(doc(A, 'ch_members/b@x.com')));
 await no('resident removes someone', deleteDoc(doc(R, 'ch_members/a@x.com')));
 await ok('manager deletes invite', deleteDoc(doc(A, 'ch_invites/tok1234567890abcd')));
 
+console.log('--- קישור לכל החדר');
+const RL = 'ch_invites/roomlink_41_xxxxxxxx';
+const rl = (o = {}) => ({ kind: 'room', room: '41', rids: ['r2', 'r3'], names: { r2: 'ש', r3: 'ת' }, taken: {}, active: true, by: 'a@x.com', at: serverTimestamp(), ...o });
+await ok('manager creates room link', setDoc(doc(A, RL), rl()));
+await no('room link with taken prefilled', setDoc(doc(A, 'ch_invites/roomlink_bad_xxxxxxxx'), rl({ taken: { r2: 'x@x.com' } })));
+await no('resident creates room link', setDoc(doc(R, 'ch_invites/roomlink_res_xxxxxxxx'), rl({ by: 'r@x.com' })));
+const pick = (db, email, rid, takenVal = email, o = {}) => { const b = writeBatch(db); b.set(doc(db, `ch_members/${email}`), { email, name: 'x', room: '41', role: 'resident', rid, invite: 'roomlink_41_xxxxxxxx', addedAt: serverTimestamp(), ...o }); b.update(doc(db, RL), { [`taken.${rid}`]: takenVal }); return b.commit(); };
+await no('pick name not in list', pick(N, 'new@x.com', 'r1'));
+await no('pick for someone else', pick(N, 'new@x.com', 'r2', 'other@x.com'));
+await no('pick into other room', pick(N, 'new@x.com', 'r2', 'new@x.com', { room: '42' }));
+await ok('pick a name', pick(N, 'new@x.com', 'r2'));
+await no('second person same name', pick(N2, 'new2@x.com', 'r2'));
+await no('steal by overwriting taken', updateDoc(doc(N2, RL), { 'taken.r2': 'new2@x.com' }));
+await ok('second person other name', pick(N2, 'new2@x.com', 'r3'));
+await ok('manager frees a name', updateDoc(doc(A, RL), { 'taken.r3': deleteField() }));
+await ok('manager disables link', updateDoc(doc(A, RL), { active: false }));
+await env.withSecurityRulesDisabled(async c => { await deleteDoc(doc(c.firestore(), 'ch_members/new2@x.com')); });
+await no('pick on disabled link', pick(N2, 'new2@x.com', 'r3'));
+await no('resident edits room link', updateDoc(doc(N, RL), { active: true }));
+await env.withSecurityRulesDisabled(async c => { await deleteDoc(doc(c.firestore(), 'ch_members/new@x.com')); });
+
 console.log('--- ch_rooms');
 await ok('manager updates own room', updateDoc(doc(A, 'ch_rooms/41'), { independent: true, ownSettings: { mopDay: 2 } }));
 await ok('resident reads room', getDoc(doc(R, 'ch_rooms/41')));

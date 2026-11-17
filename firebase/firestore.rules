@@ -203,46 +203,87 @@ service cloud.firestore {
       return /databases/$(database)/documents/ch_invites/$(t);
     }
 
+    function chInv(t) {
+      return get(chInvitePath(t)).data;
+    }
+    function chInvAfter(t) {
+      return getAfter(chInvitePath(t)).data;
+    }
+    // הצטרפות דרך קישור: אישי (פעם אחת, לדייר מסוים) או קישור לכל החדר (בוחרים שם מהרשימה)
+    function chJoinOk(m) {
+      return m.invite is string
+        && exists(chInvitePath(m.invite))
+        && m.room == chInv(m.invite).room
+        && (
+          (chInv(m.invite).get('kind', 'person') == 'person'
+            && chInv(m.invite).used == false
+            && chInvAfter(m.invite).used == true
+            && chInvAfter(m.invite).usedBy == chEmail()
+            && m.rid == chInv(m.invite).rid)
+          || (chInv(m.invite).get('kind', 'person') == 'room'
+            && chInv(m.invite).active == true
+            && m.rid is string
+            && m.rid in chInv(m.invite).rids
+            && !(m.rid in chInv(m.invite).get('taken', {}))
+            && chInvAfter(m.invite).taken[m.rid] == chEmail())
+        );
+    }
+
     match /ch_members/{email} {
       allow get: if isAdmin() || (signedIn() && request.auth.token.email_verified == true && email == chEmail());
       // אחראי החדר רואה את מי שהצטרף לחדר שלו
       allow list: if isAdmin() || (chMember() && chIsManager() && resource.data.room == chRoom());
       allow create: if isAdmin()
-        // הצטרפות עם קישור אישי: באותה כתיבה מסמנים את ההזמנה כמנוצלת
         || (signedIn() && request.auth.token.email_verified == true
             && email == chEmail()
             && request.resource.data.keys().hasOnly(['email', 'name', 'room', 'role', 'rid', 'invite', 'addedAt'])
             && request.resource.data.email == chEmail()
             && request.resource.data.role == 'resident'
-            && request.resource.data.invite is string
-            && exists(chInvitePath(request.resource.data.invite))
-            && get(chInvitePath(request.resource.data.invite)).data.used == false
-            && getAfter(chInvitePath(request.resource.data.invite)).data.used == true
-            && getAfter(chInvitePath(request.resource.data.invite)).data.usedBy == chEmail()
-            && request.resource.data.room == get(chInvitePath(request.resource.data.invite)).data.room
-            && request.resource.data.rid == get(chInvitePath(request.resource.data.invite)).data.rid);
+            && chJoinOk(request.resource.data));
       allow update: if isAdmin();
       // אחראי יכול להוציא דייר מהחדר שלו
       allow delete: if isAdmin()
         || (chMember() && chIsManager() && resource.data.room == chRoom() && resource.data.role == 'resident');
     }
 
-    // קישורים אישיים להצטרפות. מי שיש לו את הקישור יכול לקרוא אותו (המזהה אקראי וארוך)
+    // קישורי הצטרפות. מי שיש לו את הקישור יכול לקרוא אותו (המזהה אקראי וארוך)
+    //  kind 'person' (ברירת מחדל): לדייר אחד, פעם אחת
+    //  kind 'room': לכל החדר. rids = מי עוד לא מחובר, names = השמות, taken = מי כבר נבחר
     match /ch_invites/{token} {
       allow get: if signedIn();
       allow list: if isAdmin() || (chMember() && chIsManager() && resource.data.room == chRoom());
       allow create: if chManagerOf(request.resource.data.room)
-        && request.resource.data.keys().hasOnly(['room', 'rid', 'name', 'by', 'at', 'used'])
-        && request.resource.data.used == false
+        && token.size() >= 16
         && request.resource.data.by == chEmail()
-        && token.size() >= 16;
-      allow update: if signedIn() && request.auth.token.email_verified == true
-        && resource.data.used == false
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt'])
-        && request.resource.data.used == true
-        && request.resource.data.usedBy == chEmail()
-        && existsAfter(chPath())
-        && getAfter(chPath()).data.invite == token;
+        && ((request.resource.data.keys().hasOnly(['room', 'rid', 'name', 'by', 'at', 'used'])
+              && request.resource.data.used == false)
+          || (request.resource.data.keys().hasOnly(['kind', 'room', 'rids', 'names', 'taken', 'active', 'by', 'at'])
+              && request.resource.data.kind == 'room'
+              && request.resource.data.taken.size() == 0));
+      // האחראי מעדכן את הרשימה / משחרר שם / משבית
+      allow update: if (chManagerOf(resource.data.room)
+          && request.resource.data.room == resource.data.room
+          && request.resource.data.get('kind', 'person') == resource.data.get('kind', 'person'))
+        // מצטרף בקישור אישי: מסמן שנוצל
+        || (signedIn() && request.auth.token.email_verified == true
+            && resource.data.get('kind', 'person') == 'person'
+            && resource.data.used == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt'])
+            && request.resource.data.used == true
+            && request.resource.data.usedBy == chEmail()
+            && existsAfter(chPath())
+            && getAfter(chPath()).data.invite == token)
+        // מצטרף בקישור לחדר: תופס שם אחד, את שלו
+        || (signedIn() && request.auth.token.email_verified == true
+            && resource.data.get('kind', 'person') == 'room'
+            && resource.data.active == true
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['taken'])
+            && existsAfter(chPath())
+            && getAfter(chPath()).data.invite == token
+            && request.resource.data.taken.diff(resource.data.get('taken', {})).addedKeys().hasOnly([getAfter(chPath()).data.rid])
+            && request.resource.data.taken.diff(resource.data.get('taken', {})).changedKeys().size() == 0
+            && request.resource.data.taken.diff(resource.data.get('taken', {})).removedKeys().size() == 0
+            && request.resource.data.taken[getAfter(chPath()).data.rid] == chEmail());
       allow delete: if chManagerOf(resource.data.room);
     }
 
