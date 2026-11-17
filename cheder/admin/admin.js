@@ -1,12 +1,12 @@
 // =====================================================================
 //  תורנויות חדר - ממשק ניהול (reembir.com/b/cheder/admin/)
-//  רק rb077858@gmail.com. מצרפים אנשים לחדרים, מגדירים התראות ולו"ז
+//  רק rb077858@gmail.com. מצרפים אנשים לחדרים ומגדירים את הלו"ז
 // =====================================================================
 import {
   db, FS, $, esc, emailKey, isAdminUser, ADMIN_EMAIL, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, GOOGLE_SVG
-} from "../common.js?v=1";
-import * as C from "../functions/core.js?v=1";
+} from "../common.js?v=2";
+import * as C from "../core.js?v=2";
 
 const { doc, collection, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } = FS;
 
@@ -16,7 +16,7 @@ const TABS = [
   { id: "duty", label: "תורנויות", ic: "📋" },
   { id: "settings", label: "הגדרות", ic: "⚙️" }
 ];
-const S = { user: null, members: [], rooms: {}, duties: [], events: [], tokens: [], settings: C.mergeSettings(), settingsRaw: null, tab: "people", filter: "", unsubs: [], editing: null };
+const S = { user: null, members: [], rooms: {}, duties: [], events: [], settings: C.mergeSettings(), settingsRaw: null, tab: "people", filter: "", unsubs: [], editing: null };
 
 $("loginBtn").innerHTML = `${GOOGLE_SVG} התחברות עם Google`;
 $("loginBtn").onclick = async () => { $("loginErr").textContent = ""; try { await signIn(ADMIN_EMAIL); } catch (e) { $("loginErr").textContent = authError(e); } };
@@ -43,7 +43,6 @@ function subscribe() {
   on(collection(db, "ch_rooms"), s => { S.rooms = {}; s.forEach(d => { S.rooms[d.id] = d.data(); }); });
   on(query(collection(db, "ch_duties"), orderBy("date", "desc"), limit(60)), s => { S.duties = s.docs.map(d => ({ id: d.id, ...d.data() })); });
   on(query(collection(db, "ch_events"), orderBy("from", "desc"), limit(100)), s => { S.events = s.docs.map(d => ({ id: d.id, ...d.data() })); });
-  on(collection(db, "ch_tokens"), s => { S.tokens = s.docs.map(d => ({ id: d.id, ...d.data() })); });
   on(doc(db, "sites", "cheder"), s => { S.settingsRaw = s.exists() ? s.data() : null; S.settings = C.mergeSettings(S.settingsRaw); });
 }
 
@@ -74,12 +73,11 @@ function vPeople() {
   </div>`;
   h += `<div class="card"><div class="card-hd"><h2>מורשים</h2><span class="chip">${S.members.length}</span></div>
     ${S.members.length > 6 ? `<input class="inp" id="filter" data-keep="1" placeholder="חיפוש לפי מייל, שם או חדר" value="${esc(S.filter)}" style="margin-bottom:8px">` : ""}
-    ${list.length ? `<table class="tbl"><thead><tr><th>חדר</th><th>שם</th><th>מייל</th><th class="hide-sm">דיירים</th><th class="hide-sm">🔔</th><th></th></tr></thead><tbody>
+    ${list.length ? `<table class="tbl"><thead><tr><th>חדר</th><th>שם</th><th>מייל</th><th class="hide-sm">דיירים</th><th></th></tr></thead><tbody>
     ${list.map(m => {
       const r = S.rooms[m.room];
       const n = r ? C.activeResidents(r.residents).length : 0;
-      const tk = S.tokens.filter(t => t.email === m.id).length;
-      return `<tr><td><span class="room-n" style="font-size:.95rem">${esc(m.room)}</span></td><td>${esc(m.name || "—")}${m.id === emailKey(ADMIN_EMAIL) ? ` <span class="chip me">אני</span>` : ""}</td><td class="ltr small" style="text-align:right">${esc(m.email)}</td><td class="hide-sm">${n || "—"}</td><td class="hide-sm">${tk || "—"}</td>
+      return `<tr><td><span class="room-n" style="font-size:.95rem">${esc(m.room)}</span></td><td>${esc(m.name || "—")}${m.id === emailKey(ADMIN_EMAIL) ? ` <span class="chip me">אני</span>` : ""}</td><td class="ltr small" style="text-align:right">${esc(m.email)}</td><td class="hide-sm">${n || "—"}</td>
         <td style="white-space:nowrap"><button class="more-btn" data-act="edit" data-id="${esc(m.id)}" title="עריכה">✏️</button></td></tr>`;
     }).join("")}</tbody></table>` : `<div class="empty">עוד אין אף אחד</div>`}</div>`;
   return h;
@@ -159,17 +157,11 @@ function vSettings() {
     <label class="switch"><div class="tx"><b>"מחוץ לפנימייה" כחלק מתורנות המטבחון</b><span>מוסיף משימת ניקיון בחוץ לחדר התורן</span></div><input type="checkbox" data-set="outside" ${s.outside ? "checked" : ""}></label>
     <label class="field" style="margin-top:10px"><span>להזכיר לעדכן תורנות אחרי (ימים)</span><input class="inp" type="number" min="1" max="14" data-set="staleDays" value="${s.staleDays}" style="max-width:120px"></label>
   </div>
-  <div class="card"><h2>🔔 התראות פוש</h2>
-    <p class="muted small" style="margin-top:0">כדי שהחדרים יקבלו התראות גם כשהאתר סגור צריך מפתח Web Push מ-Firebase ופונקציות ענן (ראו README). בלי זה עובדות רק התראות בזמן שהאתר פתוח.</p>
-    <label class="field"><span>מפתח Web Push (VAPID)</span><input class="inp ltr" data-set="vapidKey" value="${esc(s.vapidKey)}" placeholder="BExxxx..." autocomplete="off" spellcheck="false"></label>
-    <div class="small muted">Firebase Console ← Project settings ← Cloud Messaging ← Web Push certificates ← Generate key pair</div>
-    <label class="field" style="margin-top:12px"><span>כתובת האתר (לקישור בהתראות)</span><input class="inp ltr" data-set="appUrl" value="${esc(s.appUrl)}"></label>
-    <div class="status ${S.tokens.length ? "on" : "off"}">${S.tokens.length ? `${S.tokens.length} מכשירים רשומים להתראות` : "עוד אין מכשירים רשומים"}</div>
-  </div>`;
+`;
 }
 async function saveSettings(patch) {
   const next = { ...C.mergeSettings(S.settingsRaw), ...patch };
-  await setDoc(doc(db, "sites", "cheder"), { activeDays: next.activeDays, mopDay: next.mopDay, outside: next.outside, staleDays: next.staleDays, vapidKey: next.vapidKey, appUrl: next.appUrl, updatedAt: serverTimestamp() });
+  await setDoc(doc(db, "sites", "cheder"), { activeDays: next.activeDays, mopDay: next.mopDay, outside: next.outside, staleDays: next.staleDays, updatedAt: serverTimestamp() });
   toast("נשמר ✓", 1200);
 }
 

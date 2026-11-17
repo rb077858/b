@@ -234,15 +234,6 @@ service cloud.firestore {
       allow delete: if isAdmin() || (chMember() && resource.data.byRoom == chRoom());
     }
 
-    // מכשירים שהפעילו התראות. כל אחד רואה ומוחק רק את שלו. הפונקציות בענן קוראות הכל
-    match /ch_tokens/{token} {
-      allow read, delete: if isAdmin() || (signedIn() && resource.data.email == chEmail());
-      allow create, update: if chMember()
-        && request.resource.data.email == chEmail()
-        && request.resource.data.room == chRoom()
-        && request.resource.data.keys().hasOnly(['email', 'room', 'notifyTime', 'morning', 'duty', 'ua', 'at']);
-    }
-
     // כל השאר - אדמין בלבד
     match /{document=**} {
       allow read, write: if isAdmin();

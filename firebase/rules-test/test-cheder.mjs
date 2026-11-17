@@ -69,15 +69,7 @@ await ok('admin deletes any event', deleteDoc(doc(ADM, 'ch_events/e42')));
 await env.withSecurityRulesDisabled(async c => setDoc(doc(c.firestore(), 'ch_events/e41'), ev()));
 await ok('delete own room event', deleteDoc(doc(A, 'ch_events/e41')));
 
-console.log('--- ch_tokens');
-const tok = (o = {}) => ({ email: 'a@x.com', room: '41', notifyTime: '07:00', morning: true, duty: true, ua: 'x', at: serverTimestamp(), ...o });
-await ok('register token', setDoc(doc(A, 'ch_tokens/tok1'), tok()));
-await ok('update prefs', setDoc(doc(A, 'ch_tokens/tok1'), tok({ notifyTime: '07:15' })));
-await no('wrong room', setDoc(doc(A, 'ch_tokens/tok2'), tok({ room: '42' })));
-await no('wrong email', setDoc(doc(A, 'ch_tokens/tok2'), tok({ email: 'b@x.com' })));
-await no('outsider token', setDoc(doc(O, 'ch_tokens/tok3'), tok({ email: 'out@x.com' })));
-await no('other reads token', getDoc(doc(env.authenticatedContext('uB', { email: 'b@x.com', email_verified: true }).firestore(), 'ch_tokens/tok1')));
-await ok('delete own token', deleteDoc(doc(A, 'ch_tokens/tok1')));
+await no('tokens collection closed', setDoc(doc(A, 'ch_tokens/tok1'), { email: 'a@x.com', room: '41' }));
 
 console.log('--- sites/cheder');
 await ok('anon reads settings', getDoc(doc(anon, 'sites/cheder')));

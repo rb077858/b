@@ -1,6 +1,6 @@
 // =====================================================================
 //  תורנויות חדר (cheder) - לוגיקה טהורה, בלי Firebase
-//  משותף לאתר (../app.js, ../admin/admin.js) ולפונקציות הענן (./index.js)
+//  משותף לאתר (app.js) ולממשק הניהול (admin/admin.js)
 //  - פענוח ההודעה של המדריך
 //  - אילו משימות יש בכל יום
 //  - חלוקה הוגנת של המשימות בין מי שנמצא בחדר
@@ -39,9 +39,7 @@ export const DEFAULT_SETTINGS = {
   activeDays: [0, 1, 2, 3, 4, 5], // ראשון-שישי
   mopDay: 4,                       // חמישי
   outside: true,                   // "מחוץ לפנימייה" חלק מתורנות המטבחון
-  staleDays: 3,                    // אחרי כמה ימים להזכיר לעדכן תורנות
-  vapidKey: "",
-  appUrl: "https://reembir.com/b/cheder/"
+  staleDays: 3                     // אחרי כמה ימים להזכיר לעדכן תורנות
 };
 export const mergeSettings = s => ({ ...DEFAULT_SETTINGS, ...(s || {}) });
 
@@ -324,7 +322,7 @@ export function tasksOf(plan, id) {
   return (plan.tasks || []).filter(t => plan.assign && plan.assign[t] === id);
 }
 
-// סיכום טקסט קצר להתראה של הבוקר
+// סיכום טקסט קצר של היום
 export function planSummary(plan, residents) {
   const names = Object.fromEntries((residents || []).map(r => [r.id, r.name]));
   const parts = [];

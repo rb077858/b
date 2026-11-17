@@ -1,5 +1,5 @@
 // בדיקות ללוגיקה של תורנויות חדר:  node cheder/test/core.test.mjs
-import * as C from "../functions/core.js";
+import * as C from "../core.js";
 let pass = 0, fail = 0;
 const eq = (name, a, b) => {
   const ok = JSON.stringify(a) === JSON.stringify(b);

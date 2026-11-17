@@ -3,10 +3,10 @@
 //  נכנסים עם Google. רק מי שהאדמין צירף לחדר נכנס, ורואה רק את החדר שלו.
 // =====================================================================
 import {
-  db, app, SDK, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
+  db, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, closeSheet, confirmSheet, colorOf, initials, GOOGLE_SVG
-} from "./common.js?v=1";
-import * as C from "./functions/core.js?v=1";
+} from "./common.js?v=2";
+import * as C from "./core.js?v=2";
 
 const { doc, collection, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, orderBy, limit, runTransaction, serverTimestamp, deleteField } = FS;
 
@@ -361,25 +361,8 @@ function vRoom() {
 // ---------- עוד ----------
 function vMore() {
   const u = S.user;
-  const tok = getLocalToken();
-  const supported = "Notification" in window && "serviceWorker" in navigator;
-  const perm = supported ? Notification.permission : "unsupported";
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-  const prefs = getPrefs();
-  let h = `<div class="card"><div class="card-hd"><h2>🔔 התראות למכשיר</h2>${tok ? `<span class="chip ok">פעיל</span>` : ""}</div>`;
-  if (isIOS && !standalone) h += `<div class="status warn" style="margin:0 0 12px">באייפון: קודם מוסיפים את האתר למסך הבית (שיתוף ← "הוספה למסך הבית"), פותחים משם, ואז מפעילים התראות.</div>`;
-  if (!tok) {
-    h += `<p class="muted small" style="margin-top:0">כל בוקר תקבלו מי עושה מה, ותקבלו הודעה כשהחדר נכנס לתורנות קומה או מטבחון.</p>
-      <button class="btn pri block" data-act="push-on" ${perm === "denied" || !supported ? "disabled" : ""}>הפעלת התראות</button>
-      ${perm === "denied" ? `<div class="status warn">ההתראות חסומות בדפדפן. צריך לאפשר אותן בהגדרות האתר.</div>` : ""}${!supported ? `<div class="status off">הדפדפן הזה לא תומך בהתראות.</div>` : ""}`;
-  } else {
-    h += `<label class="switch"><div class="tx"><b>סידור הבוקר</b><span>מי עושה מה היום</span></div><input type="checkbox" data-pref="morning" ${prefs.morning ? "checked" : ""}></label>
-      <label class="switch"><div class="tx"><b>תורנות חדשה</b><span>כשהחדר נכנס לתורנות קומה / מטבחון</span></div><input type="checkbox" data-pref="duty" ${prefs.duty ? "checked" : ""}></label>
-      <label class="field" style="margin-top:10px"><span>שעת ההתראה בבוקר</span><select class="inp" data-pref="notifyTime">${timeSlots().map(t => `<option ${t === prefs.notifyTime ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-      <div class="btns"><button class="btn" data-act="push-test">שליחת בדיקה</button><button class="btn danger" data-act="push-off">כיבוי במכשיר הזה</button></div>`;
-  }
-  h += `</div>`;
+  let h = "";
   h += `<div class="card"><div class="list">
     <div class="li"><span class="emo">👤</span><div class="tx"><b>${esc(u.displayName || S.member.name || "")}</b><span class="ltr">${esc(u.email)}</span></div><span class="chip">חדר ${esc(S.room)}</span></div>
     <button class="opt" data-act="theme"><span class="emo">🌓</span><span class="tx">מצב כהה / בהיר</span></button>
@@ -390,7 +373,6 @@ function vMore() {
   </div></div>`;
   return h;
 }
-const timeSlots = () => { const out = []; for (let m = 5 * 60 + 30; m <= 9 * 60; m += 15) out.push(`${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`); return out; };
 
 // =====================================================================
 //  פעולות
@@ -415,9 +397,6 @@ $("view").addEventListener("click", async e => {
     else if (a === "resident") residentSheet(el.dataset.id);
     else if (a === "absence") absenceSheet(null);
     else if (a === "delabs") await delAbsence(el.dataset.id);
-    else if (a === "push-on") await pushOn();
-    else if (a === "push-off") await pushOff();
-    else if (a === "push-test") await pushTest();
     else if (a === "theme") toggleTheme();
     else if (a === "install") installHelp();
     else if (a === "help") helpSheet();
@@ -435,15 +414,6 @@ $("view").addEventListener("submit", async e => {
     toast(`${name} נוסף לחדר`);
   }
 });
-$("view").addEventListener("change", e => {
-  const p = e.target.dataset.pref;
-  if (!p) return;
-  const prefs = getPrefs();
-  prefs[p] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
-  setPrefs(prefs);
-  savePushPrefs().catch(fail);
-});
-
 async function toggleDone(k, el) {
   const key = S.viewKey;
   if (key > today()) return;
@@ -677,95 +647,15 @@ function dutyEditor(msgs) {
   draw(s.root);
 }
 
-// התראה בתוך האתר כשהחדר נכנס לתורנות (גם בלי שרת)
+// הודעה בתוך האתר כשהחדר נכנס לתורנות
 function notifyDutyChange(prev) {
   const t0 = today();
   const before = C.roomRoles(C.dutyFor(prev, t0), S.room), now = C.roomRoles(C.dutyFor(S.duties, t0), S.room);
   if ((now.floor && !before.floor) || (now.kitchen && !before.kitchen)) {
     const msg = `חדר ${S.room} נכנס ל${now.floor ? "תורנות קומה" : "מטבחון ומועדון"}`;
     toast("📋 " + msg, 4000);
-    localNotify("תורנות חדשה", msg);
   }
 }
-
-// =====================================================================
-//  התראות (Firebase Cloud Messaging)
-// =====================================================================
-const getLocalToken = () => { try { return localStorage.getItem("ch-token"); } catch (e) { return null; } };
-const setLocalToken = t => { try { t ? localStorage.setItem("ch-token", t) : localStorage.removeItem("ch-token"); } catch (e) {} };
-function getPrefs() { let p = {}; try { p = JSON.parse(localStorage.getItem("ch-prefs") || "{}"); } catch (e) {} return { morning: true, duty: true, notifyTime: "07:00", ...p }; }
-function setPrefs(p) { try { localStorage.setItem("ch-prefs", JSON.stringify(p)); } catch (e) {} }
-
-let swReg = null;
-async function registerSW() {
-  if (!("serviceWorker" in navigator)) return null;
-  if (!swReg) swReg = await navigator.serviceWorker.register("./firebase-messaging-sw.js", { scope: "./" });
-  await navigator.serviceWorker.ready;
-  return swReg;
-}
-async function localNotify(title, body) {
-  try {
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
-    const reg = await registerSW();
-    await reg.showNotification(title, { body, icon: "icon-192.png", badge: "icon-192.png", dir: "rtl", lang: "he", tag: "ch-local" });
-  } catch (e) { console.warn(e); }
-}
-let messagingMod = null;
-async function messaging() {
-  if (!messagingMod) messagingMod = await import(`${SDK}/firebase-messaging.js`);
-  return messagingMod;
-}
-async function pushOn() {
-  if (!S.settings.vapidKey) {
-    // בלי מפתח עדיין אפשר התראות בזמן שהאתר פתוח
-    const p = await Notification.requestPermission();
-    if (p === "granted") { await registerSW(); toast("התראות בזמן שהאתר פתוח הופעלו. התראות בוקר יעבדו כשהמנהל יגדיר אותן"); }
-    return;
-  }
-  const M = await messaging();
-  if (!(await M.isSupported())) return toast("הדפדפן הזה לא תומך בהתראות פוש");
-  const perm = await Notification.requestPermission();
-  if (perm !== "granted") { render(); return toast("לא אושרו התראות"); }
-  toast("מפעיל...");
-  const reg = await registerSW();
-  const token = await M.getToken(M.getMessaging(app), { vapidKey: S.settings.vapidKey, serviceWorkerRegistration: reg });
-  if (!token) return toast("לא התקבל מפתח מכשיר");
-  setLocalToken(token);
-  await savePushPrefs();
-  listenForeground();
-  render();
-  toast("ההתראות הופעלו 🔔");
-}
-async function savePushPrefs() {
-  const token = getLocalToken();
-  if (!token) return;
-  const p = getPrefs();
-  await setDoc(doc(db, "ch_tokens", token), { email: emailKey(S.user.email), room: S.room, notifyTime: p.notifyTime, morning: !!p.morning, duty: !!p.duty, ua: navigator.userAgent.slice(0, 120), at: serverTimestamp() });
-}
-async function pushOff() {
-  const token = getLocalToken();
-  setLocalToken(null);
-  try { if (token) await deleteDoc(doc(db, "ch_tokens", token)); } catch (e) {}
-  try { const M = await messaging(); await M.deleteToken(M.getMessaging(app)); } catch (e) {}
-  render(); toast("ההתראות כובו במכשיר הזה");
-}
-async function pushTest() {
-  const plan = planFor(today());
-  const body = plan && plan.tasks.length ? C.planSummary(plan, residents()) : "אין משימות היום";
-  await localNotify(`בוקר טוב חדר ${S.room} ☀️`, body);
-  toast("נשלחה התראת בדיקה");
-}
-let fgListening = false;
-async function listenForeground() {
-  if (fgListening || !getLocalToken() || !S.settings.vapidKey) return;
-  try {
-    const M = await messaging();
-    if (!(await M.isSupported())) return;
-    fgListening = true;
-    M.onMessage(M.getMessaging(app), p => { const n = p.notification || {}; toast(`🔔 ${n.title || ""} ${n.body ? "· " + n.body.split("\n")[0] : ""}`, 5000); });
-  } catch (e) {}
-}
-setTimeout(listenForeground, 3000);
 
 // =====================================================================
 //  עזרה
