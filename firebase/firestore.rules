@@ -164,7 +164,8 @@ service cloud.firestore {
 
     // =================================================================
     //  תורנויות חדר (cheder) - אוספים שמתחילים ב-ch_
-    //  רק מי שהאדמין צירף (ch_members/<מייל>) נכנס, ורק לחדר שלו
+    //  ch_members/<מייל>: role = 'manager' (אחראי חדר, האדמין צירף) או 'resident'
+    //  (דייר שהצטרף בקישור אישי). כל אחד רואה רק את החדר שלו.
     // =================================================================
     function chEmail() {
       return request.auth.token.email.lower();
@@ -175,34 +176,117 @@ service cloud.firestore {
     function chMember() {
       return signedIn() && request.auth.token.email_verified == true && exists(chPath());
     }
-    function chRoom() {
-      return get(chPath()).data.room;
+    function chMe() {
+      return get(chPath()).data;
     }
-    function chMyRoom(room) {
+    function chRoom() {
+      return chMe().room;
+    }
+    function chIsManager() {
+      return chMe().get('role', 'manager') == 'manager';
+    }
+    // כל מי שבחדר (קריאה)
+    function chInRoom(room) {
       return isAdmin() || (chMember() && chRoom() == room);
+    }
+    // אחראי החדר (כתיבה)
+    function chManagerOf(room) {
+      return isAdmin() || (chMember() && chRoom() == room && chIsManager());
+    }
+    function chResidentOf(room) {
+      return chMember() && chRoom() == room && !chIsManager();
     }
     function chRooms(l, max) {
       return l is list && l.size() <= max;
     }
-
-    // מי מורשה ובאיזה חדר. מזהה = המייל באותיות קטנות. רק אדמין כותב
-    match /ch_members/{email} {
-      allow read: if isAdmin() || (signedIn() && request.auth.token.email_verified == true && email == chEmail());
-      allow write: if isAdmin();
+    function chInvitePath(t) {
+      return /databases/$(database)/documents/ch_invites/$(t);
     }
 
-    // החדר: מי גר בו, היעדרויות, חריגים. רק החדר עצמו (והאדמין)
+    match /ch_members/{email} {
+      allow get: if isAdmin() || (signedIn() && request.auth.token.email_verified == true && email == chEmail());
+      // אחראי החדר רואה את מי שהצטרף לחדר שלו
+      allow list: if isAdmin() || (chMember() && chIsManager() && resource.data.room == chRoom());
+      allow create: if isAdmin()
+        // הצטרפות עם קישור אישי: באותה כתיבה מסמנים את ההזמנה כמנוצלת
+        || (signedIn() && request.auth.token.email_verified == true
+            && email == chEmail()
+            && request.resource.data.keys().hasOnly(['email', 'name', 'room', 'role', 'rid', 'invite', 'addedAt'])
+            && request.resource.data.email == chEmail()
+            && request.resource.data.role == 'resident'
+            && request.resource.data.invite is string
+            && exists(chInvitePath(request.resource.data.invite))
+            && get(chInvitePath(request.resource.data.invite)).data.used == false
+            && getAfter(chInvitePath(request.resource.data.invite)).data.used == true
+            && getAfter(chInvitePath(request.resource.data.invite)).data.usedBy == chEmail()
+            && request.resource.data.room == get(chInvitePath(request.resource.data.invite)).data.room
+            && request.resource.data.rid == get(chInvitePath(request.resource.data.invite)).data.rid);
+      allow update: if isAdmin();
+      // אחראי יכול להוציא דייר מהחדר שלו
+      allow delete: if isAdmin()
+        || (chMember() && chIsManager() && resource.data.room == chRoom() && resource.data.role == 'resident');
+    }
+
+    // קישורים אישיים להצטרפות. מי שיש לו את הקישור יכול לקרוא אותו (המזהה אקראי וארוך)
+    match /ch_invites/{token} {
+      allow get: if signedIn();
+      allow list: if isAdmin() || (chMember() && chIsManager() && resource.data.room == chRoom());
+      allow create: if chManagerOf(request.resource.data.room)
+        && request.resource.data.keys().hasOnly(['room', 'rid', 'name', 'by', 'at', 'used'])
+        && request.resource.data.used == false
+        && request.resource.data.by == chEmail()
+        && token.size() >= 16;
+      allow update: if signedIn() && request.auth.token.email_verified == true
+        && resource.data.used == false
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt'])
+        && request.resource.data.used == true
+        && request.resource.data.usedBy == chEmail()
+        && existsAfter(chPath())
+        && getAfter(chPath()).data.invite == token;
+      allow delete: if chManagerOf(resource.data.room);
+    }
+
+    // החדר: דיירים, שינויים, הגדרות עצמאיות. כולם בחדר רואים, רק האחראי משנה
     match /ch_rooms/{room} {
-      allow read, write: if chMyRoom(room);
+      allow read: if chInRoom(room);
+      allow write: if chManagerOf(room);
+
+      // החלוקה של כל יום
       match /days/{day} {
-        allow read, write: if chMyRoom(room);
+        allow read: if chInRoom(room);
+        allow write: if chManagerOf(room);
+        // דייר: יכול לשמור את החלוקה המחושבת (בלי החלפות ידניות)...
+        allow create: if chResidentOf(room)
+          && request.resource.data.done.size() == 0
+          && request.resource.data.manual.size() == 0;
+        allow update: if chResidentOf(room) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tasks', 'present', 'assign', 'byPerson', 'dutyDate', 'at'])
+          // ...ולסמן רק את המשימות שלו
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['done'])
+              && request.resource.data.done.diff(resource.data.get('done', {})).affectedKeys()
+                   .hasOnly(resource.data.get('byPerson', {}).get(chMe().rid, []).concat(['bed_' + chMe().rid]))));
+      }
+
+      // היעדרויות. דייר מסמן רק את עצמו
+      match /absences/{id} {
+        allow read: if chInRoom(room);
+        allow write: if chManagerOf(room);
+        allow create: if chResidentOf(room) && request.resource.data.rid == chMe().rid;
+        allow update: if chResidentOf(room) && resource.data.rid == chMe().rid && request.resource.data.rid == chMe().rid;
+        allow delete: if chResidentOf(room) && resource.data.rid == chMe().rid;
+      }
+
+      // תורנות שהחדר הזין רק לעצמו (גוברת על המשותפת)
+      match /duties/{date} {
+        allow read: if chInRoom(room);
+        allow write: if chManagerOf(room);
       }
     }
 
-    // תורנויות קומה/מטבחון (מההודעה של המדריך). כל חדר מדביק, כולם רואים
+    // מאגר משותף: תורנויות מהודעת המדריך. אחראי חדר מוסיף, כולם רואים, רק אדמין מוחק
     match /ch_duties/{date} {
       allow read: if isAdmin() || chMember();
-      allow create, update: if isAdmin() || (chMember()
+      allow create, update: if isAdmin() || (chMember() && chIsManager()
         && request.resource.data.keys().hasOnly(['date', 'floor', 'kitchen', 'raw', 'time', 'sender', 'newRound', 'by', 'byRoom', 'at'])
         && request.resource.data.date == date
         && chRooms(request.resource.data.floor, 6)
@@ -214,10 +298,10 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // חריגים לכל הפנימייה (חופשה, טיול, העברת יום שטיפה...). מי שיצר או אדמין עורך ומוחק
+    // מאגר משותף: חופשות, טיולים, העברת יום שטיפה... מי שהוסיף (או אדמין) עורך ומוחק
     match /ch_events/{id} {
       allow read: if isAdmin() || chMember();
-      allow create: if isAdmin() || (chMember()
+      allow create: if isAdmin() || (chMember() && chIsManager()
         && request.resource.data.keys().hasOnly(['type', 'from', 'to', 'title', 'by', 'byRoom', 'at'])
         && request.resource.data.type in ['off', 'on', 'mopmove', 'mop', 'nomop', 'noduty', 'note']
         && request.resource.data.from is string
@@ -225,13 +309,23 @@ service cloud.firestore {
         && request.resource.data.get('title', '').size() <= 80
         && request.resource.data.by == chEmail()
         && request.resource.data.byRoom == chRoom());
-      allow update: if isAdmin() || (chMember()
-        && resource.data.byRoom == chRoom()
-        && request.resource.data.byRoom == chRoom()
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (chMember() && chIsManager() && resource.data.byRoom == chRoom());
+    }
+
+    // הצעות שינוי בהגדרות למנהל. כל אחד בחדר מציע ורואה את ההצעות של החדר, רק אדמין מאשר
+    match /ch_suggestions/{id} {
+      allow read: if isAdmin() || (chMember() && resource.data.room == chRoom());
+      allow create: if chMember()
+        && request.resource.data.keys().hasOnly(['room', 'by', 'byName', 'kind', 'value', 'text', 'status', 'at'])
+        && request.resource.data.room == chRoom()
         && request.resource.data.by == chEmail()
-        && request.resource.data.type in ['off', 'on', 'mopmove', 'mop', 'nomop', 'noduty', 'note']
-        && request.resource.data.get('title', '').size() <= 80);
-      allow delete: if isAdmin() || (chMember() && resource.data.byRoom == chRoom());
+        && request.resource.data.status == 'open'
+        && request.resource.data.kind in ['activeDays', 'mopDay', 'outside', 'other']
+        && request.resource.data.text is string
+        && request.resource.data.text.size() <= 400;
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (chMember() && resource.data.by == chEmail() && resource.data.status == 'open');
     }
 
     // כל השאר - אדמין בלבד

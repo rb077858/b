@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap">
-  <link rel="stylesheet" href="style.css?v=2">
+  <link rel="stylesheet" href="style.css?v=4">
   <script>
     try { document.documentElement.dataset.theme = localStorage.getItem("ch-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) {}
   </script>
@@ -28,6 +28,7 @@
       <div class="logo">🧹</div>
       <h1>תורנויות חדר</h1>
       <p id="loginText">הסידור היומי של החדר: מיטות, שולחן, טאטוא, תורנות קומה ומטבחון</p>
+      <div id="joinBox" class="hidden"></div>
       <button id="loginBtn" class="gbtn"></button>
       <button id="logoutBtn2" class="btn block hidden" style="margin-top:10px">התחברות עם חשבון אחר</button>
       <div id="loginErr" class="err"></div>
@@ -46,6 +47,6 @@
     <nav class="tabs"><div class="tabs-in" id="tabs"></div></nav>
   </div>
 
-  <script type="module" src="app.js?v=2"></script>
+  <script type="module" src="app.js?v=4"></script>
 </body>
 </html>

@@ -5,18 +5,20 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, ADMIN_EMAIL, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, GOOGLE_SVG
-} from "../common.js?v=2";
-import * as C from "../core.js?v=2";
+} from "../common.js?v=4";
+import * as C from "../core.js?v=4";
 
 const { doc, collection, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } = FS;
 
+const isMgr = m => (m.role || "manager") === "manager";
 const TABS = [
   { id: "people", label: "אנשים", ic: "👥" },
   { id: "rooms", label: "חדרים", ic: "🚪" },
   { id: "duty", label: "תורנויות", ic: "📋" },
+  { id: "sug", label: "הצעות", ic: "💡" },
   { id: "settings", label: "הגדרות", ic: "⚙️" }
 ];
-const S = { user: null, members: [], rooms: {}, duties: [], events: [], settings: C.mergeSettings(), settingsRaw: null, tab: "people", filter: "", unsubs: [], editing: null };
+const S = { sugs: [], user: null, members: [], rooms: {}, duties: [], events: [], settings: C.mergeSettings(), settingsRaw: null, tab: "people", filter: "", unsubs: [], editing: null };
 
 $("loginBtn").innerHTML = `${GOOGLE_SVG} התחברות עם Google`;
 $("loginBtn").onclick = async () => { $("loginErr").textContent = ""; try { await signIn(ADMIN_EMAIL); } catch (e) { $("loginErr").textContent = authError(e); } };
@@ -43,16 +45,17 @@ function subscribe() {
   on(collection(db, "ch_rooms"), s => { S.rooms = {}; s.forEach(d => { S.rooms[d.id] = d.data(); }); });
   on(query(collection(db, "ch_duties"), orderBy("date", "desc"), limit(60)), s => { S.duties = s.docs.map(d => ({ id: d.id, ...d.data() })); });
   on(query(collection(db, "ch_events"), orderBy("from", "desc"), limit(100)), s => { S.events = s.docs.map(d => ({ id: d.id, ...d.data() })); });
+  on(query(collection(db, "ch_suggestions"), orderBy("at", "desc"), limit(100)), s => { S.sugs = s.docs.map(d => ({ id: d.id, ...d.data() })); });
   on(doc(db, "sites", "cheder"), s => { S.settingsRaw = s.exists() ? s.data() : null; S.settings = C.mergeSettings(S.settingsRaw); });
 }
 
 function render() {
   $("tabs").style.setProperty("--n", TABS.length);
-  $("tabs").innerHTML = TABS.map(t => `<button class="tab ${t.id === S.tab ? "on" : ""}" data-tab="${t.id}"><i>${t.ic}</i>${t.label}</button>`).join("");
+  $("tabs").innerHTML = TABS.map(t => `<button class="tab ${t.id === S.tab ? "on" : ""}" data-tab="${t.id}"><i>${t.ic}</i>${t.label}${t.id === "sug" && S.sugs.some(x => x.status === "open") ? `<span class="badge">${S.sugs.filter(x => x.status === "open").length}</span>` : ""}</button>`).join("");
   const a = document.activeElement;
   if (a && a.closest && a.closest("#view") && a.matches("input, textarea, select")) { S.deferred = true; return; } // לא לשבור הקלדה
   S.deferred = false;
-  $("view").innerHTML = ({ people: vPeople, rooms: vRooms, duty: vDuty, settings: vSettings })[S.tab]();
+  $("view").innerHTML = ({ people: vPeople, rooms: vRooms, duty: vDuty, settings: vSettings, sug: vSug })[S.tab]();
 }
 document.addEventListener("focusout", () => setTimeout(() => { if (S.deferred && !(document.activeElement && document.activeElement.matches("input, textarea, select"))) render(); }, 80));
 $("tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b) { S.tab = b.dataset.tab; document.activeElement && document.activeElement.blur(); S.deferred = false; render(); scrollTo({ top: 0 }); } });
@@ -62,7 +65,7 @@ function vPeople() {
   const me = S.members.find(m => m.id === emailKey(ADMIN_EMAIL));
   const f = S.filter.trim().toLowerCase();
   const list = S.members.filter(m => !f || m.email.includes(f) || String(m.room).includes(f) || (m.name || "").toLowerCase().includes(f));
-  let h = `<div class="card"><h2>צירוף לחדר</h2><p class="muted small" style="margin-top:0">מי שיתחבר עם המייל הזה ייכנס לחדר. כרגע חשבון אחד לכל חדר.</p>
+  let h = `<div class="card"><h2>צירוף אחראי חדר</h2><p class="muted small" style="margin-top:0">מי שיתחבר עם המייל הזה יהיה אחראי החדר. הוא מוסיף את שאר הדיירים ושולח לכל אחד קישור אישי.</p>
     <form class="form-row" data-form="add">
       <label class="field" style="margin:0"><span>מייל Google</span><input class="inp ltr" name="email" type="email" required placeholder="name@gmail.com" autocomplete="off"></label>
       <label class="field" style="margin:0"><span>שם</span><input class="inp" name="name" maxlength="30" placeholder="לא חובה" autocomplete="off"></label>
@@ -73,11 +76,9 @@ function vPeople() {
   </div>`;
   h += `<div class="card"><div class="card-hd"><h2>מורשים</h2><span class="chip">${S.members.length}</span></div>
     ${S.members.length > 6 ? `<input class="inp" id="filter" data-keep="1" placeholder="חיפוש לפי מייל, שם או חדר" value="${esc(S.filter)}" style="margin-bottom:8px">` : ""}
-    ${list.length ? `<table class="tbl"><thead><tr><th>חדר</th><th>שם</th><th>מייל</th><th class="hide-sm">דיירים</th><th></th></tr></thead><tbody>
+    ${list.length ? `<table class="tbl"><thead><tr><th>חדר</th><th>שם</th><th>מייל</th><th class="hide-sm">תפקיד</th><th></th></tr></thead><tbody>
     ${list.map(m => {
-      const r = S.rooms[m.room];
-      const n = r ? C.activeResidents(r.residents).length : 0;
-      return `<tr><td><span class="room-n" style="font-size:.95rem">${esc(m.room)}</span></td><td>${esc(m.name || "—")}${m.id === emailKey(ADMIN_EMAIL) ? ` <span class="chip me">אני</span>` : ""}</td><td class="ltr small" style="text-align:right">${esc(m.email)}</td><td class="hide-sm">${n || "—"}</td>
+      return `<tr><td><span class="room-n" style="font-size:.95rem">${esc(m.room)}</span></td><td>${esc(m.name || "—")}${m.id === emailKey(ADMIN_EMAIL) ? ` <span class="chip me">אני</span>` : ""}</td><td class="ltr small" style="text-align:right">${esc(m.email)}</td><td class="hide-sm"><span class="chip ${isMgr(m) ? "ok" : ""}">${isMgr(m) ? "אחראי" : "דייר"}</span></td>
         <td style="white-space:nowrap"><button class="more-btn" data-act="edit" data-id="${esc(m.id)}" title="עריכה">✏️</button></td></tr>`;
     }).join("")}</tbody></table>` : `<div class="empty">עוד אין אף אחד</div>`}</div>`;
   return h;
@@ -88,14 +89,16 @@ async function saveMember({ email, name, room }, oldId) {
   email = emailKey(email); room = String(room || "").trim().replace(/^0+(?=\d)/, ""); name = String(name || "").trim().slice(0, 30);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { toast("מייל לא תקין"); return false; }
   if (!/^[0-9A-Za-zא-ת-]{1,6}$/.test(room)) { toast("מספר חדר לא תקין"); return false; }
-  const taken = S.members.find(m => String(m.room) === room && m.id !== email && m.id !== oldId);
+  const prev = S.members.find(m => m.id === (oldId || email));
+  const role = prev && prev.role === "resident" ? "resident" : "manager";
+  const taken = role === "manager" && S.members.find(m => String(m.room) === room && isMgr(m) && m.id !== email && m.id !== oldId);
   if (taken) {
-    if (!(await confirmSheet(`בחדר ${room} כבר יש את ${taken.name || taken.email}`, "כרגע מומלץ חשבון אחד לכל חדר. להחליף אותו בחשבון החדש? (החשבון הקודם יוסר)", "להחליף", true))) return false;
+    if (!(await confirmSheet(`לחדר ${room} כבר יש אחראי: ${taken.name || taken.email}`, "לכל חדר אחראי אחד (שאר הדיירים מצטרפים בקישור אישי מהאחראי). להחליף אותו בחשבון החדש? (החשבון הקודם יוסר)", "להחליף", true))) return false;
     await deleteDoc(doc(db, "ch_members", taken.id));
   }
   if (oldId && oldId !== email) await deleteDoc(doc(db, "ch_members", oldId));
-  const prev = S.members.find(m => m.id === (oldId || email));
-  await setDoc(doc(db, "ch_members", email), { email, name, room, addedAt: prev && prev.addedAt ? prev.addedAt : serverTimestamp(), updatedAt: serverTimestamp() });
+  const extra = role === "resident" ? { rid: prev.rid, invite: prev.invite || "" } : {};
+  await setDoc(doc(db, "ch_members", email), { email, name, room, role, ...extra, addedAt: prev && prev.addedAt ? prev.addedAt : serverTimestamp(), updatedAt: serverTimestamp() });
   toast(`${name || email} ← חדר ${room} ✓`);
   return true;
 }
@@ -129,12 +132,14 @@ function vRooms() {
   const d = C.dutyFor(S.duties, t0);
   return ids.map(id => {
     const r = S.rooms[id] || {};
-    const m = S.members.find(x => String(x.room) === id);
+    const m = S.members.find(x => String(x.room) === id && isMgr(x));
+    const accounts = S.members.filter(x => String(x.room) === id && !isMgr(x)).length;
     const res = C.activeResidents(r.residents);
     const away = res.filter(x => C.absenceOn(r.absences, x.id, t0));
     const roles = C.roomRoles(d, id);
     return `<div class="card"><div class="card-hd"><span class="room-n">${esc(id)}</span><h3 class="grow">${m ? esc(m.name || m.email) : `<span class="muted">אין חשבון משויך</span>`}</h3>
-      ${roles.floor ? `<span class="chip floor">🏢 קומה</span>` : ""}${roles.kitchen ? `<span class="chip kitchen">🍳 מטבחון</span>` : ""}</div>
+      ${r.independent ? `<span class="chip warn">🔌 עצמאי</span>` : ""}${roles.floor ? `<span class="chip floor">🏢 קומה</span>` : ""}${roles.kitchen ? `<span class="chip kitchen">🍳 מטבחון</span>` : ""}</div>
+      <div class="small muted" style="margin:-4px 0 8px">${res.length} דיירים · ${accounts} הצטרפו בקישור</div>
       <div class="chips">${res.map(x => `<span class="chip ${away.includes(x) ? "warn" : ""}">${esc(x.name)}${away.includes(x) ? " · " + C.REASONS[C.absenceOn(r.absences, x.id, t0).reason].name : ""}</span>`).join("") || `<span class="muted small">החדר עוד לא הוסיף דיירים</span>`}</div></div>`;
   }).join("");
 }
@@ -148,10 +153,48 @@ function vDuty() {
   return h;
 }
 
+// ---------- הצעות ----------
+const SUG_KINDS = { activeDays: "ימי ניקיון", mopDay: "יום השטיפה", outside: "\"מחוץ לפנימייה\"", other: "אחר" };
+function sugValue(x) {
+  if (x.kind === "activeDays") return (x.value || []).map(i => C.DAY_NAMES[i]).join(", ");
+  if (x.kind === "mopDay") return x.value >= 0 ? "יום " + C.DAY_NAMES[x.value] : "בלי שטיפה";
+  if (x.kind === "outside") return x.value ? "כן" : "לא";
+  return "";
+}
+function curValue(kind) {
+  const s = S.settings;
+  return kind === "activeDays" ? s.activeDays.map(i => C.DAY_NAMES[i]).join(", ") : kind === "mopDay" ? (s.mopDay >= 0 ? "יום " + C.DAY_NAMES[s.mopDay] : "בלי שטיפה") : kind === "outside" ? (s.outside ? "כן" : "לא") : "";
+}
+function vSug() {
+  const open = S.sugs.filter(x => x.status === "open"), rest = S.sugs.filter(x => x.status !== "open");
+  const row = x => `<div class="li" style="align-items:flex-start"><span class="emo">💡</span><div class="tx"><b>חדר ${esc(x.room)} · ${SUG_KINDS[x.kind] || ""}${sugValue(x) ? ": " + esc(sugValue(x)) : ""}</b>
+      <span>${x.kind !== "other" ? `כרגע: ${esc(curValue(x.kind))} · ` : ""}${esc(x.text || "")}${x.byName ? " · " + esc(x.byName) : ""}${x.reply ? " · תשובה: " + esc(x.reply) : ""}</span></div>
+      ${x.status === "open" ? `<div class="row" style="flex-wrap:wrap;justify-content:flex-end">${x.kind !== "other" ? `<button class="btn sm pri" data-act="sugok" data-id="${x.id}">אישור והחלה</button>` : `<button class="btn sm pri" data-act="sugdone" data-id="${x.id}">טופל</button>`}<button class="btn sm danger" data-act="sugno" data-id="${x.id}">דחייה</button></div>`
+        : `<span class="chip ${x.status === "approved" ? "ok" : "bad"}">${x.status === "approved" ? "אושר" : "נדחה"}</span><button class="more-btn" data-act="sugdel" data-id="${x.id}" title="מחיקה">🗑</button>`}</div>`;
+  return `<div class="card"><div class="card-hd"><h2>הצעות ממתינות</h2><span class="chip">${open.length}</span></div>
+    ${open.length ? `<div class="list">${open.map(row).join("")}</div>` : `<div class="muted small">אין הצעות חדשות. חדרים יכולים להציע שינוי בהגדרות מלשונית "עוד" באתר.</div>`}</div>
+    ${rest.length ? `<div class="card"><h2>טופלו</h2><div class="list">${rest.slice(0, 30).map(row).join("")}</div></div>` : ""}`;
+}
+async function answerSug(id, status) {
+  const x = S.sugs.find(y => y.id === id);
+  if (!x) return;
+  let reply = "";
+  if (status === "rejected") {
+    reply = await new Promise(res => {
+      sheet(`<h2>דחיית ההצעה</h2><label class="field"><span>תשובה לחדר (לא חובה)</span><input class="inp" id="rp" maxlength="120" autofocus></label><div class="btns"><button class="btn danger fill grow" data-act="ok">דחייה</button><button class="btn" data-act="close">ביטול</button></div>`,
+        (act, el, root, close) => { if (act === "ok") { const v = root.querySelector("#rp").value.trim(); close(); res(v); } });
+    });
+    if (reply === undefined) return;
+  }
+  if (status === "approved" && x.kind !== "other") await saveSettings({ [x.kind]: x.value });
+  await setDoc(doc(db, "ch_suggestions", id), { status, reply, answeredAt: Date.now() }, { merge: true });
+  toast(status === "approved" ? (x.kind !== "other" ? "אושר וההגדרה עודכנה לכל החדרים ✓" : "סומן כטופל") : "נדחה");
+}
+
 // ---------- הגדרות ----------
 function vSettings() {
   const s = S.settings;
-  return `<div class="card"><h2>לו"ז קבוע</h2>
+  return `<div class="card"><h2>לו"ז קבוע (משותף לכל החדרים)</h2><p class="muted small" style="margin:0">חל על כל החדרים שמחוברים למאגר המשותף. חדרים במצב עצמאי קובעים לעצמם.</p>
     <div class="field" style="margin-top:12px"><span>ימים עם ניקיון בוקר</span><div class="seg">${C.DAY_NAMES.map((n, i) => `<button data-act="day" data-v="${i}" class="${s.activeDays.includes(i) ? "on" : ""}">${n}</button>`).join("")}</div></div>
     <div class="field"><span>יום שטיפת החדר</span><div class="seg">${C.DAY_NAMES.map((n, i) => `<button data-act="mop" data-v="${i}" class="${s.mopDay === i ? "on" : ""}">${n}</button>`).join("")}<button data-act="mop" data-v="-1" class="${s.mopDay < 0 ? "on" : ""}">אין</button></div></div>
     <label class="switch"><div class="tx"><b>"מחוץ לפנימייה" כחלק מתורנות המטבחון</b><span>מוסיף משימת ניקיון בחוץ לחדר התורן</span></div><input type="checkbox" data-set="outside" ${s.outside ? "checked" : ""}></label>
@@ -183,6 +226,10 @@ $("view").addEventListener("click", async e => {
       sheet(`<h2>לצרף אותי</h2><label class="field"><span>החדר שלי</span><input class="inp ltr" id="myRoom" inputmode="numeric" autofocus></label><div class="btns"><button class="btn pri grow" data-act="ok">צירוף</button></div>`,
         async (act, el2, root, close) => { if (act === "ok" && await saveMember({ email: ADMIN_EMAIL, name: S.user.displayName || "", room: root.querySelector("#myRoom").value })) close(); });
     }
+    else if (a === "sugok") await answerSug(el.dataset.id, "approved");
+    else if (a === "sugdone") await answerSug(el.dataset.id, "approved");
+    else if (a === "sugno") await answerSug(el.dataset.id, "rejected");
+    else if (a === "sugdel") await deleteDoc(doc(db, "ch_suggestions", el.dataset.id));
     else if (a === "deld") { if (await confirmSheet("למחוק את התורנות?", "", "מחיקה", true)) await deleteDoc(doc(db, "ch_duties", el.dataset.id)); }
     else if (a === "dele") { if (await confirmSheet("למחוק את השינוי?", "", "מחיקה", true)) await deleteDoc(doc(db, "ch_events", el.dataset.id)); }
     else if (a === "day") { const v = +el.dataset.v; const days = s.activeDays.includes(v) ? s.activeDays.filter(x => x !== v) : [...s.activeDays, v].sort(); await saveSettings({ activeDays: days }); }

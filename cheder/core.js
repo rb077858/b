@@ -301,14 +301,21 @@ export function buildPlan({ key, room, residents, absences, duty, history, exist
   const tasks = tasksForDay(key, duty, room, settings, events);
   const present = presentOn(residents, absences, key);
   const done = (existing && existing.done) || {};
+  const manual = (existing && existing.manual) || {};
+  // מישהו חדש הגיע (נוסף לחדר / חזר) - מחלקים מחדש את מה שעוד לא בוצע ולא הוחלף ידנית
+  const joined = !!existing && present.some(id => !(existing.present || []).includes(id));
   const keep = {};
   for (const [t, id] of Object.entries((existing && existing.assign) || {})) {
-    if (tasks.includes(t) && (present.includes(id) || done[t])) keep[t] = id;
+    if (!tasks.includes(t)) continue;
+    if (done[t] || manual[t] || (!joined && present.includes(id))) keep[t] = id;
   }
   const assign = assignTasks({ tasks, present, history, key, keep });
   for (const [t, id] of Object.entries(keep)) if (!present.includes(id)) assign[t] = id; // בוצע לפני שסומן כנעדר
-  const plan = { date: key, tasks, present, assign, dutyDate: duty ? duty.date : null };
+  const byPerson = {};
+  for (const t of tasks) if (assign[t]) (byPerson[assign[t]] = byPerson[assign[t]] || []).push(t);
+  const plan = { date: key, tasks, present, assign, byPerson, dutyDate: duty ? duty.date : null };
   const same = !!existing
+    && JSON.stringify(sortObj(existing.byPerson || {})) === JSON.stringify(sortObj(byPerson))
     && JSON.stringify(existing.tasks || []) === JSON.stringify(tasks)
     && JSON.stringify(existing.present || []) === JSON.stringify(present)
     && JSON.stringify(sortObj(existing.assign || {})) === JSON.stringify(sortObj(assign))
@@ -316,6 +323,34 @@ export function buildPlan({ key, room, residents, absences, duty, history, exist
   return { plan, changed: !same };
 }
 const sortObj = o => Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
+
+// ---------------------------------------------------------------------
+//  מאגר משותף מול הגדרות של החדר
+//  room = מסמך החדר: { independent, ownSettings, ignoredEvents, events }
+// ---------------------------------------------------------------------
+// תורנות שהחדר הזין לעצמו גוברת על המשותפת מאותו תאריך (עד העדכון המשותף הבא)
+export function mergeDuties(shared, local, independent) {
+  const loc = (local || []).map(d => ({ ...d, local: true }));
+  if (independent) return loc;
+  const byDate = new Map((shared || []).map(d => [d.date, d]));
+  for (const d of loc) byDate.set(d.date, d);
+  return [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
+}
+export function mergeEvents(shared, roomDoc, roomId) {
+  const r = roomDoc || {};
+  const own = (r.events || []).map(e => ({ ...e, room: String(roomId) }));
+  if (r.independent) return own;
+  const ignored = new Set(r.ignoredEvents || []);
+  return [...(shared || []).filter(e => !ignored.has(e.id)).map(e => ({ ...e, room: null })), ...own];
+}
+export const SETTING_KEYS = ["activeDays", "mopDay", "outside"];
+export function roomSettings(shared, roomDoc) {
+  const base = mergeSettings(shared);
+  if (!roomDoc || !roomDoc.independent) return base;
+  const own = roomDoc.ownSettings || {};
+  for (const k of SETTING_KEYS) if (own[k] !== undefined) base[k] = own[k];
+  return base;
+}
 
 // המשימות של אדם אחד ביום (לפי סדר המשימות)
 export function tasksOf(plan, id) {

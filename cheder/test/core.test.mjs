@@ -96,6 +96,24 @@ eq("late duty keeps room tasks", ["table", "sweep"].every(t => withDuty.assign[t
 eq("week projection", C.projectPlans({ fromKey: "2026-11-15", days: 7, room: "41", residents, absences, duties: [duty], history: hist, events: ev }).map(p => p.tasks.length), [2, 6, 0, 0, 6, 7, 0]);
 eq("nobody present", C.buildPlan({ ...args, absences: ["a", "b", "c"].map(rid => ({ rid, from: "2026-11-01" })) }).plan.assign, {});
 
+const solo = C.buildPlan({ ...args, residents: [residents[0]] }).plan;
+const grown = C.buildPlan({ ...args, existing: { ...solo, done: { table: true }, manual: {} } }).plan;
+eq("new roommate -> re-split (done stays)", [grown.assign.table, new Set(Object.values(grown.assign)).size > 1], ["a", true]);
+const back = C.buildPlan({ ...args, existing: { ...base, done: {}, manual: { sweep: true } } }).plan;
+eq("manual swap kept", back.assign.sweep, base.assign.sweep);
+
+console.log("--- מאגר משותף");
+const sh = [{ date: "2026-11-16", floor: ["37"], kitchen: ["39"] }, { date: "2026-11-19", floor: ["50"], kitchen: [] }];
+const lo = [{ date: "2026-11-17", floor: ["41"], kitchen: [] }];
+eq("local overrides until next shared", ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19"].map(k => C.dutyFor(C.mergeDuties(sh, lo, false), k).floor[0]), ["37", "41", "41", "50"]);
+eq("same date: local wins", C.dutyFor(C.mergeDuties(sh, [{ date: "2026-11-16", floor: ["99"] }], false), "2026-11-16").floor, ["99"]);
+eq("independent: only local", C.mergeDuties(sh, lo, true).map(d => d.date), ["2026-11-17"]);
+const gEv = [{ id: "g1", type: "off", from: "2026-11-18" }, { id: "g2", type: "mop", from: "2026-11-20" }];
+eq("ignored shared event", C.mergeEvents(gEv, { ignoredEvents: ["g1"], events: [{ id: "r1", type: "note", from: "2026-11-18" }] }, "41").map(e => e.id + ":" + e.room), ["g2:null", "r1:41"]);
+eq("independent events", C.mergeEvents(gEv, { independent: true, events: [] }, "41"), []);
+eq("room settings only when independent", [C.roomSettings({ mopDay: 4 }, { ownSettings: { mopDay: 2 } }).mopDay, C.roomSettings({ mopDay: 4 }, { independent: true, ownSettings: { mopDay: 2 } }).mopDay], [4, 2]);
+eq("byPerson", (() => { const p = C.buildPlan(args).plan; return Object.entries(p.byPerson).every(([id, ts]) => ts.every(t => p.assign[t] === id)) && Object.values(p.byPerson).flat().length === p.tasks.length; })(), true);
+
 console.log("--- תאריכים");
 eq("dateKey tz", C.dateKey(new Date("2026-11-16T22:30:00Z")), "2026-11-17");
 eq("slot", C.slotOf(new Date("2026-11-17T05:37:00Z")), "07:30");
