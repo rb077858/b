@@ -8,8 +8,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, colorOf, initials, GOOGLE_SVG
-} from "./common.js?v=4";
-import * as C from "./core.js?v=4";
+} from "./common.js?v=5";
+import * as C from "./core.js?v=5";
 
 const { doc, collection, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, runTransaction, writeBatch, serverTimestamp, deleteField, arrayUnion, arrayRemove } = FS;
 
@@ -248,7 +248,7 @@ const roleChips = key => {
   for (const e of info.events) if (e.type === "note" || (e.type !== "off" && e.title)) ch.push(`<span class="chip">${C.EVENT_TYPES[e.type].icon} ${esc(e.title || C.EVENT_TYPES[e.type].short)}</span>`);
   return ch.join("");
 };
-const absText = ab => `${C.REASONS[ab.reason].icon} ${C.REASONS[ab.reason].name}${ab.to ? ` עד ${C.fmtDate(ab.to)}` : " · עד הודעה חדשה"}${ab.note ? " · " + esc(ab.note) : ""}`;
+const absText = ab => `${C.reasonOf(ab).icon} ${C.reasonOf(ab).name}${ab.to ? ` עד ${C.fmtDate(ab.to)}` : " · עד הודעה חדשה"}${ab.note ? " · " + esc(ab.note) : ""}`;
 const modeBanner = () => independent() ? `<div class="status warn" style="margin:0 0 14px">🔌 <span class="grow">החדר במצב עצמאי - לא מחובר למאגר המשותף</span></div>` : "";
 
 // ---------- היום ----------
@@ -312,7 +312,8 @@ function vToday() {
         ${ab && !isPast && canEditPerson(r.id) ? `<button class="btn sm" data-act="back" data-id="${r.id}">חזר ✓</button>` : ""}</div></div>`;
     }
   }
-  if (info.active && !isPast) h += `<p class="muted small center">${isManager() ? "⇄ מעביר משימה למישהו אחר · ⋯ ליד שם: חולה / לא הגיע / החלפה" : "מסמנים ✓ על מה שעשית · ⋯ ליד השם שלך: חולה / לא בחדר"}</p>`;
+  if (info.active && away.length) h += `<div class="status off small" style="margin:4px 0 12px">🛏️ <span class="grow">${away.map(r => esc(r.name)).join(", ")} לא בחדר - לדאוג שהמיטה ${away.length > 1 ? "שלהם" : "שלו"} מסודרת. מי שיושב עליה בהמשך - מסדר.</span></div>`;
+  if (info.active && !isPast) h += `<p class="muted small center">${isManager() ? "⇄ מעביר משימה למישהו אחר · ⋯ ליד שם: חולה / נסע הביתה / החלפה" : "מסמנים ✓ על מה שעשית · ⋯ ליד השם שלך: חולה / נסע הביתה"}</p>`;
   return h;
 }
 
@@ -337,7 +338,7 @@ function vWeek() {
         return `<div class="wrow"><span class="n" ${id === me ? `style="color:var(--a)"` : ""}>${esc(nameOf(id))}</span><span class="t">${ts.length ? ts.map(t => C.TASKS[t].icon + " " + C.TASKS[t].name).join(" · ") : "🛏️ רק מיטה"}</span></div>`;
       }).join("")}</div>`;
     }
-    if (awayIds.length) h += `<div class="small muted" style="margin-top:6px">לא בחדר: ${awayIds.map(r => { const a = C.absenceOn(absences(), r.id, p.date); return esc(r.name) + (a ? " " + C.REASONS[a.reason].icon : ""); }).join(", ")}</div>`;
+    if (awayIds.length) h += `<div class="small muted" style="margin-top:6px">לא בחדר: ${awayIds.map(r => { const a = C.absenceOn(absences(), r.id, p.date); return esc(r.name) + (a ? " " + C.reasonOf(a).icon : ""); }).join(", ")}</div>`;
     h += `</div>`;
   }
   h += `</div><p class="muted small center" style="margin-top:12px">תורנות קומה/מטבחון בימים הבאים מוצגת לפי העדכון האחרון, ותתעדכן כשהמדריך ישלח חדשה.</p>`;
@@ -424,10 +425,10 @@ function vRoom() {
   h += `<div class="sec-title">היעדרויות, מחלות וחופשות אישיות</div><div class="card">
     ${abs.length ? `<div class="list">${abs.map(a => {
       const cur = a.from <= t0 && (!a.to || a.to >= t0), fut = a.from > t0;
-      return `<div class="li"><span class="emo">${C.REASONS[a.reason].icon}</span><div class="tx"><b>${esc(nameOf(a.rid))} · ${C.REASONS[a.reason].name}</b><span>${C.fmtDate(a.from)}${a.to ? (a.to !== a.from ? " – " + C.fmtDate(a.to) : "") : " · עד הודעה חדשה"}${a.note ? " · " + esc(a.note) : ""}</span></div>
+      return `<div class="li"><span class="emo">${C.reasonOf(a).icon}</span><div class="tx"><b>${esc(nameOf(a.rid))} · ${C.reasonOf(a).name}</b><span>${C.fmtDate(a.from)}${a.to ? (a.to !== a.from ? " – " + C.fmtDate(a.to) : "") : " · עד הודעה חדשה"}${a.note ? " · " + esc(a.note) : ""}</span></div>
         ${cur ? `<span class="chip warn">עכשיו</span>` : fut ? `<span class="chip">בקרוב</span>` : `<span class="chip ok">הסתיים</span>`}
         ${canEditPerson(a.rid) && (!a.legacy || mgr) ? `<button class="more-btn" data-act="delabs" data-id="${a.id}" aria-label="מחיקה">🗑</button>` : ""}</div>`;
-    }).join("")}</div>` : `<div class="muted small">אין היעדרויות. מישהו חולה או לא הגיע? סמנו כאן והמשימות שלו יחולקו לאחרים.</div>`}
+    }).join("")}</div>` : `<div class="muted small">אין היעדרויות. מישהו חולה או נסע הביתה? סמנו כאן והמשימות שלו יחולקו לאחרים.</div>`}
     ${mgr || me ? `<div class="btns"><button class="btn" data-act="absence">＋ סימון היעדרות</button></div>` : ""}</div>`;
 
   // מאגר משותף
@@ -599,8 +600,8 @@ function personSheet(id) {
   const others = isManager() ? plan.present.filter(x => x !== id) : [];
   sheet(`<div class="row" style="margin-bottom:12px">${avatar(r)}<div><h2>${esc(r.name)}</h2><div class="sub" style="margin:0">${esc(C.fmtDay(key))}</div></div></div>
     <button class="opt" data-act="abs" data-r="sick"><span class="emo">🤒</span><span class="tx">חולה<span>המשימות יחולקו לאחרים</span></span></button>
-    <button class="opt" data-act="abs" data-r="missing"><span class="emo">🚫</span><span class="tx">לא הגיע</span></button>
-    <button class="opt" data-act="abs" data-r="home"><span class="emo">🏠</span><span class="tx">בבית / נסע</span></button>
+    <button class="opt" data-act="abs" data-r="home"><span class="emo">🏠</span><span class="tx">נסע הביתה</span></button>
+    <button class="opt" data-act="abs" data-r="other"><span class="emo">📝</span><span class="tx">אחר</span></button>
     ${others.length ? `<button class="opt" data-act="swap"><span class="emo">🔄</span><span class="tx">החלפת תורנות עם מישהו<span>מתחלפים בכל המשימות של היום</span></span></button>` : ""}`,
   (act, el, root, close) => {
     if (act === "abs") { close(); absenceSheet(id, el.dataset.r, key); }
@@ -649,7 +650,7 @@ function absenceSheet(rid, reason = "sick", from = today()) {
     close();
     try {
       await addDoc(absCol(), { rid: st.rid, reason: st.reason, from: st.from, to, note, by: myEmail(), at: Date.now() });
-      toast(`${nameOf(st.rid)} סומן: ${C.REASONS[st.reason].name}. המשימות חולקו מחדש`);
+      toast(`${nameOf(st.rid)} סומן: ${C.reasonOf(st).name}. המשימות חולקו מחדש\n🛏️ לדאוג עכשיו שהמיטה שלו מסודרת`, 5000);
     } catch (e) { fail(e); }
   });
   draw(s.root);
@@ -916,7 +917,7 @@ function helpSheet() {
       <div class="li"><span class="emo">☀️</span><div class="tx"><b>כל בוקר חלוקה חדשה</b><span>כל אחד מסדר את המיטה שלו. פינוי שולחן וטאטוא מתחלקים, ובחמישי גם שטיפה.</span></div></div>
       <div class="li"><span class="emo">👥</span><div class="tx"><b>אחראי ודיירים</b><span>אחראי החדר מוסיף את הדיירים ושולח לכל אחד קישור אישי. דייר רואה את הלו"ז ומסמן את מה ששלו.</span></div></div>
       <div class="li"><span class="emo">📋</span><div class="tx"><b>תורנות קומה ומטבחון</b><span>מדביקים את ההודעה של המדריך בלשונית "תורנות". מספיק שחדר אחד ידביק, וזה מתעדכן לכולם. אפשר גם להזין אחרת רק לחדר.</span></div></div>
-      <div class="li"><span class="emo">🤒</span><div class="tx"><b>מישהו חולה / לא הגיע</b><span>⋯ ליד השם. המשימות שלו עוברות לאחרים, ומה שכבר בוצע נשאר.</span></div></div>
+      <div class="li"><span class="emo">🤒</span><div class="tx"><b>מישהו חולה / נסע הביתה</b><span>⋯ ליד השם. המשימות שלו עוברות לאחרים, ומה שכבר בוצע נשאר.</span></div></div>
       <div class="li"><span class="emo">⇄</span><div class="tx"><b>החלפות</b><span>האחראי מעביר משימה (⇄) או מחליף בין שניים את כל המשימות (⋯ ← החלפת תורנות).</span></div></div>
       <div class="li"><span class="emo">🏖️</span><div class="tx"><b>חופשות, טיולים ושינויים</b><span>בלשונית "השבוע". משותף לכל הפנימייה או רק לחדר, ואפשר לסמן שינוי משותף "לא חל עלינו".</span></div></div>
       <div class="li"><span class="emo">🔌</span><div class="tx"><b>מצב עצמאי</b><span>בלשונית "החדר" אפשר לצאת מהמאגר המשותף ולנהל הכל לבד, כולל ימי ניקיון ויום שטיפה.</span></div></div>

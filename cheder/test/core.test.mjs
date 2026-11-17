@@ -43,9 +43,9 @@ eq("empty", C.parseDutyText("בוקר טוב לכולם", "2026-11-17"), []);
 console.log("--- ימים ומשימות");
 const duty = { date: "2026-11-16", floor: ["37", "41", "45"], kitchen: ["39"] };
 eq("dutyFor", C.dutyFor([{ date: "2026-11-10" }, duty, { date: "2026-11-20" }], "2026-11-17").date, "2026-11-16");
-eq("sunday room 41", C.tasksForDay("2026-11-15", duty, "41"), ["table", "sweep", "hall", "restroom", "sinks", "toilets"]);
-eq("thursday mop", C.tasksForDay("2026-11-19", null, "41"), ["table", "sweep", "mop"]);
-eq("kitchen room", C.tasksForDay("2026-11-17", duty, "39"), ["table", "sweep", "kitchen", "club", "outside"]);
+eq("sunday room 41", C.tasksForDay("2026-11-15", duty, "41"), ["table", "sweep", "trash", "hall", "restroom", "sinks", "toilets", "bins"]);
+eq("thursday mop", C.tasksForDay("2026-11-19", null, "41"), ["table", "sweep", "trash", "mop"]);
+eq("kitchen room", C.tasksForDay("2026-11-17", duty, "39"), ["table", "sweep", "trash", "kitchen", "club", "outside"]);
 eq("shabbat none", C.tasksForDay("2026-11-21", duty, "41"), []);
 const ev = [
   { type: "off", from: "2026-11-17", to: "2026-11-18", title: "טיול" },
@@ -54,11 +54,11 @@ const ev = [
   { type: "on", from: "2026-11-28" }
 ];
 eq("trip off", C.tasksForDay("2026-11-18", duty, "41", null, ev), []);
-eq("mop moved away", C.tasksForDay("2026-11-19", null, "41", null, ev), ["table", "sweep"]);
-eq("mop moved to friday", C.tasksForDay("2026-11-20", null, "41", null, ev), ["table", "sweep", "mop"]);
-eq("noduty only room 41", C.tasksForDay("2026-11-22", duty, "41", null, ev), ["table", "sweep"]);
-eq("noduty not for 37", C.tasksForDay("2026-11-22", duty, "37", null, ev).length, 6);
-eq("shabbat forced on", C.tasksForDay("2026-11-28", null, "41", null, ev), ["table", "sweep"]);
+eq("mop moved away", C.tasksForDay("2026-11-19", null, "41", null, ev), ["table", "sweep", "trash"]);
+eq("mop moved to friday", C.tasksForDay("2026-11-20", null, "41", null, ev), ["table", "sweep", "trash", "mop"]);
+eq("noduty only room 41", C.tasksForDay("2026-11-22", duty, "41", null, ev), ["table", "sweep", "trash"]);
+eq("noduty not for 37", C.tasksForDay("2026-11-22", duty, "37", null, ev).length, 8);
+eq("shabbat forced on", C.tasksForDay("2026-11-28", null, "41", null, ev), ["table", "sweep", "trash"]);
 
 console.log("--- חלוקה");
 const residents = [{ id: "a", name: "אבי" }, { id: "b", name: "בני" }, { id: "c", name: "גדי" }, { id: "d", name: "דני", left: "2026-11-01" }];
@@ -76,7 +76,7 @@ const st = C.computeStats(hist, ["a", "b", "c"]);
 const loads = ["a", "b", "c"].map(id => st[id].load);
 console.log("        loads:", loads.join(", "), " tasks:", ["a", "b", "c"].map(id => JSON.stringify(st[id].tasks)).join(" "));
 eq("balanced load (max-min <= 10%)", (Math.max(...loads) - Math.min(...loads)) / Math.max(...loads) <= 0.1, true);
-eq("everyone did every room task", ["a", "b", "c"].every(id => st[id].tasks.table && st[id].tasks.sweep && st[id].tasks.mop), true);
+eq("everyone did every room task", ["a", "b", "c"].every(id => st[id].tasks.table && st[id].tasks.sweep && st[id].tasks.trash && st[id].tasks.mop), true);
 // עקביות - אותו קלט, אותה תוצאה
 const args = { key: "2026-11-17", room: "41", residents, absences: [], duty, history: hist.slice(-30), existing: null };
 eq("deterministic", C.buildPlan(args).plan, C.buildPlan(args).plan);
@@ -93,7 +93,7 @@ eq("unchanged -> changed:false", C.buildPlan({ ...args, existing: base }).change
 const noDuty = C.buildPlan({ ...args, duty: null }).plan;
 const withDuty = C.buildPlan({ ...args, existing: noDuty }).plan;
 eq("late duty keeps room tasks", ["table", "sweep"].every(t => withDuty.assign[t] === noDuty.assign[t]), true);
-eq("week projection", C.projectPlans({ fromKey: "2026-11-15", days: 7, room: "41", residents, absences, duties: [duty], history: hist, events: ev }).map(p => p.tasks.length), [2, 6, 0, 0, 6, 7, 0]);
+eq("week projection", C.projectPlans({ fromKey: "2026-11-15", days: 7, room: "41", residents, absences, duties: [duty], history: hist, events: ev }).map(p => p.tasks.length), [3, 8, 0, 0, 8, 9, 0]);
 eq("nobody present", C.buildPlan({ ...args, absences: ["a", "b", "c"].map(rid => ({ rid, from: "2026-11-01" })) }).plan.assign, {});
 
 const solo = C.buildPlan({ ...args, residents: [residents[0]] }).plan;

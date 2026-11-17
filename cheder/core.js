@@ -13,11 +13,13 @@ export const DAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "�
 export const TASKS = {
   table:    { name: "פינוי השולחן",          icon: "🍽️", w: 1, group: "room" },
   sweep:    { name: "טאטוא החדר",            icon: "🧹", w: 2, group: "room" },
+  trash:    { name: "פינוי הפח של החדר",     icon: "🗑️", w: 1, group: "room" },
   mop:      { name: "שטיפת החדר",            icon: "🪣", w: 3, group: "room" },
   hall:     { name: "טאטוא המסדרון",         icon: "🧹", w: 2, group: "floor" },
   restroom: { name: "שטיפת השירותים",        icon: "🚿", w: 3, group: "floor" },
   sinks:    { name: "ניקוי הכיורים",         icon: "🚰", w: 1, group: "floor" },
   toilets:  { name: "ניקוי האסלות",          icon: "🚽", w: 2, group: "floor" },
+  bins:     { name: "פינוי כל הפחים בקומה לפח הגדול בחוץ", icon: "♻️", w: 2, group: "floor" },
   kitchen:  { name: "ניקוי המטבחון",         icon: "🍳", w: 2, group: "kitchen" },
   club:     { name: "ניקוי המועדון",         icon: "🛋️", w: 2, group: "kitchen" },
   outside:  { name: "ניקיון מחוץ לפנימייה",  icon: "🌳", w: 2, group: "kitchen" }
@@ -30,10 +32,12 @@ export const GROUPS = {
 };
 export const REASONS = {
   sick:    { name: "חולה",          icon: "🤒" },
-  missing: { name: "לא הגיע",       icon: "🚫" },
-  home:    { name: "בבית / נסע",    icon: "🏠" },
+  home:    { name: "נסע הביתה",     icon: "🏠" },
   other:   { name: "אחר",           icon: "📝" }
 };
+
+// סיבה של היעדרות (כולל ישנות שכבר לא ברשימה)
+export const reasonOf = a => REASONS[a && a.reason] || REASONS.other;
 
 export const DEFAULT_SETTINGS = {
   activeDays: [0, 1, 2, 3, 4, 5], // ראשון-שישי
@@ -219,11 +223,11 @@ export function tasksForDay(key, duty, room, settings, events) {
   const s = mergeSettings(settings);
   const info = dayInfo(key, room, s, events);
   if (!info.active) return [];
-  const t = ["table", "sweep"];
+  const t = ["table", "sweep", "trash"];
   if (info.mop) t.push("mop");
   if (info.duty) {
     const r = roomRoles(duty, room);
-    if (r.floor) t.push("hall", "restroom", "sinks", "toilets");
+    if (r.floor) t.push("hall", "restroom", "sinks", "toilets", "bins");
     if (r.kitchen) t.push("kitchen", "club", ...(s.outside ? ["outside"] : []));
   }
   return t;

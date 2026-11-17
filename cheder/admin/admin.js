@@ -5,8 +5,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, ADMIN_EMAIL, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, GOOGLE_SVG
-} from "../common.js?v=4";
-import * as C from "../core.js?v=4";
+} from "../common.js?v=5";
+import * as C from "../core.js?v=5";
 
 const { doc, collection, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } = FS;
 
@@ -140,7 +140,7 @@ function vRooms() {
     return `<div class="card"><div class="card-hd"><span class="room-n">${esc(id)}</span><h3 class="grow">${m ? esc(m.name || m.email) : `<span class="muted">אין חשבון משויך</span>`}</h3>
       ${r.independent ? `<span class="chip warn">🔌 עצמאי</span>` : ""}${roles.floor ? `<span class="chip floor">🏢 קומה</span>` : ""}${roles.kitchen ? `<span class="chip kitchen">🍳 מטבחון</span>` : ""}</div>
       <div class="small muted" style="margin:-4px 0 8px">${res.length} דיירים · ${accounts} הצטרפו בקישור</div>
-      <div class="chips">${res.map(x => `<span class="chip ${away.includes(x) ? "warn" : ""}">${esc(x.name)}${away.includes(x) ? " · " + C.REASONS[C.absenceOn(r.absences, x.id, t0).reason].name : ""}</span>`).join("") || `<span class="muted small">החדר עוד לא הוסיף דיירים</span>`}</div></div>`;
+      <div class="chips">${res.map(x => `<span class="chip ${away.includes(x) ? "warn" : ""}">${esc(x.name)}${away.includes(x) ? " · " + C.reasonOf(C.absenceOn(r.absences, x.id, t0)).name : ""}</span>`).join("") || `<span class="muted small">החדר עוד לא הוסיף דיירים</span>`}</div></div>`;
   }).join("");
 }
 
