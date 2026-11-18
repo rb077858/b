@@ -4,11 +4,11 @@
 //  צפייה בכל הממים שנשלחו, עריכה, מחיקה והורדה כתמונה.
 // =====================================================================
 import { app, db, SDK, ADMIN_EMAIL } from "../../firebase/config.js?v=20261101h";
-import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc, cleanPos, enableDrag } from "../meme.js?v=20261117a";
+import { catName, loadFonts, loadImage, drawMeme, clampSize, corsUrl, esc, cleanPos, enableDrag } from "../meme.js?v=20261118a";
 
 const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } =
   await import(`${SDK}/firebase-auth.js`);
-const { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, serverTimestamp, writeBatch, deleteField } =
+const { collection, query, orderBy, onSnapshot, doc, updateDoc, deleteDoc, setDoc, serverTimestamp, writeBatch, deleteField } =
   await import(`${SDK}/firebase-firestore.js`);
 
 const $ = id => document.getElementById(id);
@@ -56,7 +56,9 @@ onAuthStateChanged(auth, async user => {
 // ---------------------------------------------------------------------
 function listen() {
   $("list").innerHTML = Array.from({ length: 8 }, () => `<div class="skel"></div>`).join("");
-  unsub = onSnapshot(query(collection(db, "memes"), orderBy("createdAt", "desc")), snap => {
+  const offJudge = onSnapshot(doc(db, "memes_judge", "config"), s => { judgeCfg = s.exists() ? s.data() : null; renderJudge(); },
+    e => console.error(e));
+  const offMemes = onSnapshot(query(collection(db, "memes"), orderBy("createdAt", "desc")), snap => {
     memes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     for (const id of selected) if (!memes.some(m => m.id === id)) selected.delete(id);
     render();
@@ -71,7 +73,63 @@ function listen() {
     console.error(err);
     $("list").innerHTML = `<div class="empty"><span class="big">⛔</span>אין הרשאה לקרוא את הממים (${esc(err.code)})</div>`;
   });
+  unsub = () => { offJudge(); offMemes(); };
 }
+
+// ---------------------------------------------------------------------
+//  קישור שיפוט (memes_judge/config = { enabled, token })
+// ---------------------------------------------------------------------
+let judgeCfg = null;
+const judgeLink = t => new URL(`../judge/#${t}`, location.href).href;
+function newToken() {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function saveJudge(data, msg) {
+  try { await setDoc(doc(db, "memes_judge", "config"), { ...data, updatedAt: serverTimestamp() }, { merge: true }); if (msg) toast(msg); }
+  catch (e) { console.error(e); toast("השמירה נכשלה", true); }
+}
+function renderJudge() {
+  $("judgeBar").hidden = filter !== "new";
+  const on = !!(judgeCfg?.token && judgeCfg.enabled);
+  $("judgeBar").classList.toggle("on", on);
+  $("jbState").textContent = !judgeCfg?.token ? "צרו קישור ששולחים לחברים, והם יבחרו מה מצחיק"
+    : on ? "🟢 הקישור פעיל - לחצו להעתקה, השבתה או איפוס" : "⚪ הקישור מושבת";
+  if ($("jSheet").hidden) return;
+  if (!judgeCfg?.token) {
+    $("jBody").innerHTML = `<button id="jCreate" class="primary jwide">🔗 יצירת קישור</button>`;
+    $("jCreate").onclick = () => saveJudge({ enabled: true, token: newToken() }, "הקישור נוצר ✓");
+    return;
+  }
+  const link = judgeLink(judgeCfg.token);
+  $("jBody").innerHTML = `
+    <label class="jswitch">
+      <input type="checkbox" id="jOn" ${on ? "checked" : ""}>
+      <span class="sw"></span>
+      <span>${on ? "הקישור <b>פעיל</b>" : "הקישור <b>מושבת</b> - מי שנכנס יראה שהוא לא פעיל"}</span>
+    </label>
+    <div class="jlink ${on ? "" : "off"}">
+      <input id="jUrl" readonly value="${esc(link)}" dir="ltr" aria-label="הקישור">
+      <button id="jCopy" class="primary">העתקה</button>
+    </div>
+    ${navigator.share ? `<button id="jShare" class="ghost jwide">📤 שיתוף</button>` : ""}
+    <button id="jReset" class="link-btn jreset">🔄 איפוס הקישור (הקישור הישן יפסיק לעבוד)</button>`;
+  $("jOn").onchange = e => saveJudge({ enabled: e.target.checked }, e.target.checked ? "הקישור הופעל" : "הקישור הושבת");
+  $("jUrl").onclick = e => e.target.select();
+  $("jCopy").onclick = async () => {
+    try { await navigator.clipboard.writeText(link); }
+    catch { $("jUrl").select(); document.execCommand("copy"); }
+    toast("הקישור הועתק ✓");
+  };
+  if ($("jShare")) $("jShare").onclick = () => navigator.share({ title: "מצחיק או לא? 😂", text: "עזרו לבחור ממים לעיתון השנתי!", url: link }).catch(() => {});
+  $("jReset").onclick = () => {
+    if (!confirm("לאפס את הקישור?\nהקישור הישן יפסיק לעבוד מיד, וצריך יהיה לשלוח את החדש.")) return;
+    saveJudge({ token: newToken() }, "נוצר קישור חדש ✓");
+  };
+}
+$("judgeBar").onclick = () => { $("jSheet").hidden = false; renderJudge(); };
+$("jClose").onclick = () => { $("jSheet").hidden = true; };
+$("jSheet").addEventListener("click", e => { if (e.target === $("jSheet")) $("jSheet").hidden = true; });
 
 $("filters").addEventListener("click", e => {
   const b = e.target.closest(".cat");
@@ -85,6 +143,7 @@ $("filters").addEventListener("click", e => {
 
 const isDl = m => m.status === "downloaded";
 function render() {
+  $("judgeBar").hidden = filter !== "new";
   $("nNew").textContent = memes.filter(m => !isDl(m)).length;
   $("nDl").textContent = memes.filter(isDl).length;
   $("nAll").textContent = memes.length;
@@ -105,7 +164,7 @@ function render() {
   $("list").replaceChildren(frag);
   paintSelection();
 }
-const sig = m => JSON.stringify([m.top, m.bottom, m.size, m.status, m.imageUrl, m.topPos, m.bottomPos]);
+const sig = m => JSON.stringify([m.top, m.bottom, m.size, m.status, m.imageUrl, m.topPos, m.bottomPos, !!m.judgedAt]);
 
 function card(m) {
   const c = document.createElement("button");
@@ -113,7 +172,7 @@ function card(m) {
   c.dataset.id = m.id;
   c.dataset.sig = sig(m);
   c.innerHTML = `
-    <div class="pic"><canvas></canvas><span class="check" aria-hidden="true"></span>${isDl(m) ? `<span class="badge dl">הורד ✓</span>` : `<span class="badge">חדש</span>`}</div>
+    <div class="pic"><canvas></canvas><span class="check" aria-hidden="true"></span>${isDl(m) ? (m.judgedAt ? `<span class="badge dl">😂 שופטים</span>` : `<span class="badge dl">הורד ✓</span>`) : `<span class="badge">חדש</span>`}</div>
     <div class="meta"><b>${esc(m.top || m.bottom)}</b><span>${esc(when(m.createdAt))}</span></div>`;
   const cv = c.querySelector("canvas");
   Promise.all([loadImage(m.thumbUrl || m.imageUrl), loadFonts()])
@@ -208,7 +267,7 @@ $("bMark").onclick = () => {
   const ids = [...selected], to = $("bMark").dataset.to;
   bulk("מעדכן...", async () => {
     try {
-      await batchWrite(ids, (b, r) => b.update(r, to === "downloaded" ? { status: to, downloadedAt: serverTimestamp() } : { status: to }));
+      await batchWrite(ids, (b, r) => b.update(r, to === "downloaded" ? { status: to, downloadedAt: serverTimestamp() } : { status: to, judgedAt: deleteField() }));
       toast("עודכן ✓"); setSelectMode(false);
     } catch (e) { console.error(e); toast("העדכון נכשל", true); }
   });
@@ -311,7 +370,7 @@ async function showMeme(id, refresh = false) {
     ${m.bottom ? `<dt>למטה</dt><dd>${esc(m.bottom)}</dd>` : ""}
     <dt>קטגוריה</dt><dd class="mt">${esc(catName(m.category))}</dd>
     ${m.sourceDesc ? `<dt>תמונה</dt><dd class="mt">${esc(m.sourceDesc)}</dd>` : ""}
-    <dt>סטטוס</dt><dd>${isDl(m) ? "✅ הורד" : "🆕 חדש"}</dd>`;
+    <dt>סטטוס</dt><dd>${isDl(m) ? (m.judgedAt ? "😂 נבחר כמצחיק בקישור השיפוט" : "✅ הורד") : "🆕 חדש"}</dd>`;
   $("aStatus").textContent = isDl(m) ? "סימון כחדש" : "סימון כהורד (בלי להוריד)";
 
   if (!refresh || changed || !vImg) {
@@ -367,6 +426,7 @@ document.addEventListener("keydown", e => {
   const k = e.code, mod = e.ctrlKey || e.metaKey;
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== "range";
 
+  if (!$("jSheet").hidden) { if (k === "Escape") { e.preventDefault(); $("jSheet").hidden = true; } return; }
   if (!$("keys").hidden) { if (k === "Escape" || e.key === "?") { e.preventDefault(); toggleHelp(false); } return; }
 
   // עריכה
@@ -471,7 +531,7 @@ function fileName(m) {
 $("aStatus").onclick = async () => {
   const m = byId(curId);
   if (!m) return;
-  try { await updateDoc(doc(db, "memes", m.id), { status: isDl(m) ? "new" : "downloaded" }); }
+  try { await updateDoc(doc(db, "memes", m.id), isDl(m) ? { status: "new", judgedAt: deleteField() } : { status: "downloaded" }); }
   catch { toast("העדכון נכשל", true); }
 };
 

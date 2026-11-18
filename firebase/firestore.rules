@@ -160,6 +160,40 @@ service cloud.firestore {
         && request.resource.data.status == 'new'
         && request.resource.data.createdAt == request.time;
       allow read, update, delete: if isAdmin();
+
+      // שופטים (מי שנכנס בקישור השיפוט): רואים רק ממים חדשים,
+      // "מצחיק" = מעבירים ל"הורדו", "לא מצחיק" = מוחקים. רק מם שעדיין חדש
+      allow read: if memesJudge() && resource.data.status == 'new';
+      allow update: if memesJudge() && resource.data.status == 'new'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'judgedAt'])
+        && request.resource.data.status == 'downloaded'
+        && request.resource.data.judgedAt == request.time;
+      allow delete: if memesJudge() && resource.data.status == 'new';
+    }
+
+    // קישור השיפוט: memes_judge/config = { enabled, token }. אדמין בלבד
+    function memesJudgeCfg() {
+      return get(/databases/$(database)/documents/memes_judge/config).data;
+    }
+    // שופט = משתמש (אנונימי) שרשם את הטוקן הנוכחי, והקישור פעיל.
+    // איפוס הטוקן או השבתה מבטלים מיד את הגישה של כל השופטים הקודמים
+    function memesJudge() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/memes_judges/$(request.auth.uid))
+        && memesJudgeCfg().enabled == true
+        && get(/databases/$(database)/documents/memes_judges/$(request.auth.uid)).data.token == memesJudgeCfg().token;
+    }
+    match /memes_judge/{d} {
+      allow read, write: if isAdmin();
+    }
+    match /memes_judges/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['token', 'at'])
+        && request.resource.data.token is string
+        && memesJudgeCfg().enabled == true
+        && request.resource.data.token == memesJudgeCfg().token;
+      allow delete: if isAdmin();
     }
 
     // =================================================================

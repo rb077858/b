@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Heebo:wght@400;500;700;800;900&display=swap">
-  <link rel="stylesheet" href="../style.css?v=20261117a">
-  <link rel="stylesheet" href="admin.css?v=20261117a">
+  <link rel="stylesheet" href="../style.css?v=20261118a">
+  <link rel="stylesheet" href="admin.css?v=20261118a">
 </head>
 <body>
   <div id="boot" class="boot"><div class="spin"></div></div>
@@ -62,6 +62,11 @@
     </div>
 
     <main class="main">
+      <button id="judgeBar" class="judge-bar" hidden>
+        <span class="jb-ic">😂</span>
+        <span class="jb-txt"><b>קישור שיפוט</b><small id="jbState">צרו קישור ששולחים לחברים, והם יבחרו מה מצחיק</small></span>
+        <span class="jb-go">›</span>
+      </button>
       <div id="list" class="agrid"></div>
     </main>
 
@@ -130,6 +135,17 @@
     </div>
   </section>
 
+  <!-- קישור שיפוט -->
+  <section id="jSheet" class="done" hidden>
+    <div class="done-card jsheet">
+      <div class="done-ic">😂</div>
+      <h2>קישור שיפוט</h2>
+      <p>מי שנכנס לקישור רואה את הממים <b>החדשים</b> אחד-אחד ובוחר:<br><b>😂 מצחיק</b> - עובר ל"הורדו" · <b>😐 לא מצחיק</b> - נמחק</p>
+      <div id="jBody"></div>
+      <button id="jClose" class="ghost jclose">סגירה</button>
+    </div>
+  </section>
+
   <!-- קיצורי מקשים -->
   <section id="keys" class="done" hidden>
     <div class="done-card keys-card">
@@ -170,6 +186,6 @@
 
   <div id="toast" class="toast" role="status"></div>
 
-  <script type="module" src="admin.js?v=20261117a"></script>
+  <script type="module" src="admin.js?v=20261118a"></script>
 </body>
 </html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0c0a1d">
+  <title>שיפוט ממים - העיתון השנתי</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>😂</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://storage.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Heebo:wght@400;500;700;800;900&display=swap">
+  <link rel="stylesheet" href="../style.css?v=20261118a">
+  <link rel="stylesheet" href="judge.css?v=20261118a">
+</head>
+<body class="judge">
+  <header class="jhdr">
+    <div class="jbrand"><span class="jlogo">👑</span><b>מצחיק או לא?</b></div>
+    <div class="jstats"><span id="left"></span><span id="mine" hidden></span></div>
+  </header>
+
+  <main class="jstage" id="stage">
+    <div id="card" class="jcard" hidden>
+      <canvas id="cv"></canvas>
+      <div class="stamp funny" id="stFunny">😂</div>
+      <div class="stamp nope" id="stNope">😐</div>
+    </div>
+    <div id="state" class="jstate"><div class="spin"></div></div>
+  </main>
+
+  <footer class="jbtns" id="btns" hidden>
+    <button id="bFunny" class="jbtn funny" title="מצחיק (→)"><span class="em">😂</span><span>מצחיק</span></button>
+    <button id="bNope" class="jbtn nope" title="לא מצחיק (←)"><span class="em">😐</span><span>לא מצחיק</span></button>
+  </footer>
+
+  <div id="undo" class="jundo" hidden>
+    <span id="undoTxt"></span>
+    <button id="undoBtn">↩ ביטול</button>
+  </div>
+
+  <section id="intro" class="done" hidden>
+    <div class="done-card">
+      <div class="done-ic">😂</div>
+      <h2>עוזרים לבחור ממים לעיתון!</h2>
+      <p>יופיעו ממים שנשלחו לעיתון השנתי, אחד-אחד. לכל מם בוחרים:</p>
+      <ul class="how jhow">
+        <li><b>😂 מצחיק</b> - נשאר בשביל העיתון</li>
+        <li><b>😐 לא מצחיק</b> - נמחק</li>
+      </ul>
+      <p class="jtip">אפשר גם להחליק ימינה (מצחיק) או שמאלה (לא מצחיק)</p>
+      <button id="introGo" class="primary">יאללה!</button>
+    </div>
+  </section>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="judge.js?v=20261118a"></script>
+</body>
+</html>
