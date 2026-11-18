@@ -1,0 +1,11 @@
+name = "web"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+# הדומיין המותאם. דורש שהדומיין reembir.com מנוהל ב-Cloudflare.
+routes = [
+  { pattern = "web.reembir.com", custom_domain = true }
+]
+
+# NEXTDNS_ID לא נשמר כאן (המאגר עשוי להיות ציבורי).
+# מגדירים אותו בדאשבורד: Worker ← Settings ← Variables and Secrets ← NEXTDNS_ID = 711ceb
