@@ -152,3 +152,33 @@ kbd {
 /* גרירת טקסט בעריכה */
 .v-stage.editing #vCv { touch-action: none; outline: 2px dashed rgba(255,210,63,.55); outline-offset: 4px; }
 #vCv.dragging { cursor: grabbing !important; }
+
+/* ---------- קישור שיפוט ---------- */
+.judge-bar {
+  width: 100%; display: flex; align-items: center; gap: 12px; text-align: right;
+  padding: 12px 14px; margin-bottom: 14px; border-radius: 16px;
+  background: var(--card); border: 1px dashed rgba(255,210,63,.45);
+  transition: transform .15s, background .15s;
+}
+.judge-bar:active { transform: scale(.98); }
+.judge-bar.on { border-style: solid; border-color: rgba(61,220,151,.5); background: rgba(61,220,151,.08); }
+.jb-ic { font-size: 30px; line-height: 1; }
+.jb-txt { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jb-txt b { font-size: 16px; }
+.jb-txt small { color: var(--mut); font-size: 13px; }
+.jb-go { font-size: 26px; color: var(--mut); transform: scaleX(-1); }
+.jsheet p { font-size: 14.5px; }
+.jwide { width: 100%; margin-top: 10px; }
+.jclose { width: 100%; margin-top: 10px; height: 46px; font-size: 15px; }
+.jswitch { display: flex; align-items: center; gap: 12px; text-align: right; padding: 12px; border-radius: 14px; background: rgba(255,255,255,.05); cursor: pointer; font-size: 15px; }
+.jswitch input { position: absolute; opacity: 0; pointer-events: none; }
+.jswitch .sw { flex: none; width: 50px; height: 30px; border-radius: 999px; background: #3a3566; position: relative; transition: background .2s; }
+.jswitch .sw::after { content: ""; position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.jswitch input:checked + .sw { background: var(--ok); }
+.jswitch input:checked + .sw::after { transform: translateX(-20px); }
+.jswitch input:focus-visible + .sw { box-shadow: 0 0 0 3px var(--vio); }
+.jlink { display: flex; gap: 8px; margin-top: 12px; }
+.jlink input { flex: 1; min-width: 0; height: 48px; border-radius: 12px; padding: 0 12px; background: #120f26; border: 1px solid var(--line); font-size: 13px; color: var(--txt); outline: none; }
+.jlink .primary { height: 48px; padding: 0 16px; font-size: 15px; }
+.jlink.off { opacity: .5; }
+.jreset { margin-top: 14px !important; color: #ff9b9b !important; }
