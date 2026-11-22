@@ -405,19 +405,34 @@ service cloud.firestore {
 
     // =================================================================
     //  צפייה משותפת (kupa-rashit) - kr_sync/<חדר>
-    //  החדר נוצר פעם אחת ולא משתנה: רק ה"פיגור" (lag, באלפיות) מהזמן האמיתי.
+    //  מצב הניגון של מי ששיתף: wall (רגע בשעון המשותף), abs (איפה התוכן היה), rate, paused.
+    //  owner = המשתמש (האנונימי) שיצר את החדר. רק הוא משנה, rev עולה ב-1 בכל שינוי.
     //  מי שיש לו את הקישור (מזהה אקראי) קורא. אין רשימה של כל החדרים.
     //  peers: נוכחות - כל צופה מעדכן את עצמו כל 15 שניות (מתי + הסטייה שלו)
     // =================================================================
+    function krState(d) {
+      return d.keys().hasOnly(['v', 'owner', 'wall', 'abs', 'rate', 'paused', 'ended', 'rev', 'at'])
+        && d.keys().hasAll(['v', 'owner', 'wall', 'abs', 'rate', 'paused', 'ended', 'rev', 'at'])
+        && d.v == 3
+        && d.owner == request.auth.uid
+        && d.wall is number && d.abs is number
+        && d.rate is number && d.rate >= 0.25 && d.rate <= 4
+        && d.paused is bool && d.ended is bool
+        && d.rev is int
+        && d.at == request.time;
+    }
     match /kr_sync/{room} {
       allow get: if true;
-      allow create: if room.matches('[A-Za-z0-9]{10,32}')
-        && request.resource.data.keys().hasOnly(['v', 'lag', 'at'])
-        && request.resource.data.keys().hasAll(['v', 'lag', 'at'])
-        && request.resource.data.v == 2
-        && request.resource.data.lag is number
-        && request.resource.data.lag >= 0 && request.resource.data.lag <= 43200000
-        && request.resource.data.at == request.time;
+      allow create: if request.auth != null
+        && room.matches('[A-Za-z0-9]{10,32}')
+        && krState(request.resource.data)
+        && request.resource.data.rev == 0
+        && request.resource.data.ended == false;
+      allow update: if request.auth != null
+        && resource.data.owner == request.auth.uid
+        && resource.data.ended == false
+        && krState(request.resource.data)
+        && request.resource.data.rev > resource.data.rev;
 
       match /peers/{pid} {
         allow read: if true;

@@ -144,7 +144,10 @@ export class Player {
     this.played = false;
     this.retries = 0;
     this.timers = [];
-    this.sync = null;       // { lag }: צפייה משותפת - הרגע המוצג = עכשיו פחות lag (זהה לכל מי שיש לו את הקישור)
+    // צפייה משותפת: { mode: "room"|"link", host, state: {wall, abs, rate, paused}, rev, err }
+    //  הרגע שצריך להיות על המסך נגזר מ-state (ראו syncAbs). room = חדר במסד, הבעלים שולט.
+    //  link = קישור חלופי בלי מסד (פיגור קבוע; שינוי ידני מבטל את הסנכרון אצל מי ששינה)
+    this.sync = null;
     this.build();
     this.initDelay();
   }
@@ -303,7 +306,7 @@ export class Player {
    */
   async load(p) {
     this.p = p;
-    if (p.sync != null) this.sync = { lag: p.sync };
+    if (p.sync) this.sync = { err: null, rev: 0, ...p.sync };
     this.markSync();
     this.following = !this.sync;
     this.offset = null;
@@ -474,7 +477,7 @@ export class Player {
 
     let target = null;
     {
-      if (this.sync && this.offset != null) target = this.posOf(this.syncNow() - this.sync.lag);
+      if (this.sync && this.offset != null) target = this.posOf(this.syncAbs());
       else if (typeof p.startAt === "number" && this.offset != null) target = this.posOf(p.startAt);
       else if (p.startAt === "start" && win && this.offset != null) target = this.posOf(win.start);
     }
@@ -515,22 +518,40 @@ export class Player {
     }
     if (v.muted && !this.prefs.muted) this.el.unmute.classList.remove("hide");
   }
-  toggle() { const v = this.el.video; if (!v.paused) this.unsync(); if (v.paused) { if (this.following && this.latency() > this.delay + 20) this.following = false; this.play(true); } else v.pause(); }
+  toggle() {
+    const v = this.el.video;
+    if (this.sync && !this.sync.host && this.sync.mode === "room" && v.paused && !this.sync.state.paused) { this.play(true); return; }  // חזרה לסנכרון
+    const c = this.ctl();
+    if (c === "blocked") return;
+    if (c === "host") { const a = this.curAbs(); if (a != null) this.hostSet(a, !this.sync.state.paused); return; }
+    if (v.paused) { if (this.following && this.latency() > this.delay + 20) this.following = false; this.play(true); } else v.pause();
+  }
   toggleMute() { const v = this.el.video; v.muted = !v.muted; if (!v.muted && v.volume === 0) v.volume = 1; this.prefs.muted = v.muted; this.savePrefs(); this.el.unmute.classList.add("hide"); }
   skip(sec, tap) {
-    this.unsync();
+    const c = this.ctl();
+    if (c === "blocked") return;
     const v = this.el.video, [s, e] = this.range();
-    const t = clamp(v.currentTime + sec, s + (this.p?.clip ? 0 : 0.5), e - (this.p?.replay ? 0.5 : Math.min(this.delay, 4)));
+    const base = c === "host" ? this.shownPos() : v.currentTime;
+    const t = clamp(base + sec, s + (this.p?.clip ? 0 : 0.5), e - (this.p?.replay ? 0.5 : Math.min(this.delay, 4)));
+    if (c === "host") {
+      this.hostSet(this.absOf(t));
+      if (tap) { const el = sec < 0 ? this.el.tapL : this.el.tapR; el.textContent = (sec < 0 ? "−" : "+") + Math.abs(sec); el.classList.add("show"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("show"), 600); }
+      return;
+    }
     v.currentTime = t;
     this.following = this.p?.replay ? false : sec < 0 ? false : e - t < this.delay + 6;
     if (this.following) v.playbackRate = 1;
     if (tap) { const el = sec < 0 ? this.el.tapL : this.el.tapR; el.textContent = (sec < 0 ? "−" : "+") + Math.abs(sec); el.classList.add("show"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("show"), 600); }
     this.syncUi();
   }
-  seekAbs(abs) { this.unsync(); const p = this.posOf(abs); if (p == null) return; const [s, e] = this.range(); this.el.video.currentTime = clamp(p, s + 0.5, e - 2); this.following = e - p < this.delay + 6; this.play(true); this.syncUi(); }
+  seekAbs(abs) { const c = this.ctl(); if (c === "blocked") return; if (c === "host") { const [s, e] = this.range(); const q = this.posOf(abs); if (q != null) this.hostSet(this.absOf(clamp(q, s + 0.5, e - 2)), false); return; } const p = this.posOf(abs); if (p == null) return; const [s, e] = this.range(); this.el.video.currentTime = clamp(p, s + 0.5, e - 2); this.following = e - p < this.delay + 6; this.play(true); this.syncUi(); }
   goLive(user) {
     if (this.p?.replay) return;
-    if (user) this.unsync();
+    if (user) {
+      const c = this.ctl();
+      if (c === "blocked") return;
+      if (c === "host") { this.hostSet(this.absOf(Math.max(this.range()[0], this.edge() - this.delay)), false, 1); this.toast("חזרה לשידור החי (לכולם)"); return; }
+    }
     const v = this.el.video;
     this.following = true;
     v.currentTime = Math.max(this.range()[0], this.edge() - this.delay);
@@ -678,9 +699,15 @@ export class Player {
     const end = ev => {
       if (!this.dragging) return;
       this.dragging = false; sk.classList.remove("drag");
-      this.unsync();
       const pos = show(at(ev));
+      const c = this.ctl();
+      if (c === "blocked") { this.syncUi(); return; }
       const e = this.edge();
+      if (c === "host") {
+        const live = !this.p?.replay && e - pos < this.delay + 6;
+        this.hostSet(this.absOf(live ? e - this.delay : pos));
+        return;
+      }
       if (!this.p?.replay && e - pos < this.delay + 6) this.goLive();
       else { this.following = false; this.el.video.currentTime = pos; }
       this.syncUi();
@@ -793,9 +820,13 @@ export class Player {
       if (d.m) return this.renderMenu(d.m);
       if (d.t === "stats") { this.prefs.stats = !this.prefs.stats; this.el.stats.classList.toggle("hide", !this.prefs.stats); this.renderStats(); }
       if (d.q) { this.prefs.quality = d.q; this.applyQuality(); }
-      if (d.s) { this.unsync(); this.prefs.speed = +d.s; this.el.video.playbackRate = +d.s; if (+d.s > 1 && this.following && this.latency() < this.delay + 8) { this.toast("אתם כבר בשידור החי"); } }
+      if (d.s && this.sync) {
+        const c = this.ctl();
+        if (c === "blocked") { this.toggleMenu(false); return; }
+        if (c === "host") { const a = this.curAbs(); if (a != null) this.hostSet(a, undefined, +d.s); this.renderMenu("main"); return; }
+      }
+      if (d.s) { this.prefs.speed = +d.s; this.el.video.playbackRate = +d.s; if (+d.s > 1 && this.following && this.latency() < this.delay + 8) { this.toast("אתם כבר בשידור החי"); } }
       if (d.d) {
-        this.unsync();
         if (d.d === "auto") { this.prefs.delayMode = "auto"; this.prefs.delay = null; this.mode = "auto"; this.initDelay(); }
         else { this.prefs.delayMode = "fixed"; this.prefs.delay = +d.d; this.mode = "fixed"; this.delay = +d.d; }
         if (this.following) this.goLive();
@@ -823,7 +854,7 @@ export class Player {
       `dvr       ${dur(e - s)}`,
       q ? `dropped   ${q.droppedVideoFrames}/${q.totalVideoFrames}` : "",
       `rate      ${v.playbackRate.toFixed(2)}x`,
-      this.sync ? `sync      lag ${(this.sync.lag / 1000).toFixed(2)}s, off ${((this.sync.diff || 0) * 1000).toFixed(0)}ms, avg ${((this.sync.err || 0) * 1000).toFixed(0)}ms` : "",
+      this.sync ? `sync      ${this.sync.mode}${this.sync.host ? " (owner)" : ""} rev ${this.sync.rev}, off ${((this.sync.diff || 0) * 1000).toFixed(0)}ms, avg ${((this.sync.err || 0) * 1000).toFixed(0)}ms` : "",
       this.sync && this.o.clockInfo ? `clock     ${this.o.clockInfo()}` : "",
       `engine    ${h ? "hls.js" : "native"}`
     ].filter(Boolean).join("\n");
@@ -859,44 +890,118 @@ export class Player {
     if (f && !v.paused && p - f.at < 250 && p - f.at > -100) return f.media + ((p - f.at) / 1000) * v.playbackRate;
     return v.currentTime;
   }
-  startSync(lag) {
-    this.sync = { lag, err: null };
+  // התוכן (זמן אמיתי, אלפיות) שצריך להיות על המסך ברגע now
+  syncAbs(now = this.syncNow()) {
+    const st = this.sync.state;
+    if (st.paused || now < st.wall) return st.abs;
+    return st.abs + (now - st.wall) * st.rate;
+  }
+  curAbs() { return this.absOf(this.shownPos()); }
+  // מי מחליט: "free" = אין סנכרון (או קישור חלופי - ואז הסנכרון מתבטל), "host" = הבעלים, "blocked" = אורח
+  ctl() {
+    const sy = this.sync;
+    if (!sy) return "free";
+    if (sy.mode === "link") { this.unsync(); return "free"; }
+    if (sy.host) return "host";
+    this.banner("<b>אתם בצפייה משותפת</b> - רק מי ששיתף את הקישור שולט בניגון. רוצים לשלוט בעצמכם?",
+      [["יציאה מהצפייה המשותפת", () => this.unsync(), true], ["הישארות", () => {}]], 10000);
+    return "blocked";
+  }
+  // הבעלים משנה: מעדכנים את החדר (לכולם) ומיד גם אצלו.
+  // ניגון/קפיצה מתחילים 0.4 שנ׳ בעתיד, כדי שכל המכשירים יספיקו לקבל ויתחילו באותו רגע בדיוק
+  hostSet(abs, paused = this.sync.state.paused, rate = this.sync.state.rate) {
+    if (abs == null) return;
+    const now = this.syncNow();
+    const st = { wall: paused ? now : now + 400, abs: Math.round(abs), rate, paused };
+    this.sync.state = st;
+    this.sync.rev++;
+    this.o.onHostChange?.(st, this.sync.rev);
+    this.applySync(true);
+    this.syncUi();
+  }
+  // מצב חדש מהחדר (מהבעלים)
+  setSyncState(st, rev) {
+    if (!this.sync || this.sync.mode !== "room" || rev < this.sync.rev) return;
+    if (rev === this.sync.rev && this.sync.host) return;   // ההד של השינוי שלנו
+    const prev = this.sync.state;
+    this.sync.state = { wall: st.wall, abs: st.abs, rate: st.rate, paused: st.paused };
+    this.sync.rev = rev;
+    if (!this.sync.host && prev && rev > 0) {
+      if (st.paused && !prev.paused) this.toast("⏸ השידור נעצר על ידי מי ששיתף");
+      else if (!st.paused && prev.paused) this.toast("▶ ממשיכים יחד");
+      else if (st.rate !== prev.rate) this.toast(`מהירות ${st.rate === 1 ? "רגילה" : st.rate + "x"}`);
+    }
+    this.applySync(true);
+  }
+  // מיישם את מצב החדר עכשיו (קפיצה למקום, עצירה, או תזמון התחלה משותפת)
+  applySync(jump) {
+    const v = this.el.video, sy = this.sync;
+    if (!sy || this.offset == null) return;
+    const st = sy.state, now = this.syncNow();
+    const [s, e] = this.range();
+    const want = clamp(this.posOf(this.syncAbs(now)), s + 0.5, Math.max(s + 0.5, e - 1.5));
+    clearTimeout(this.startT);
+    if (st.paused || now < st.wall) {
+      if (!v.paused) v.pause();
+      if (Math.abs(v.currentTime - want) > 0.02) v.currentTime = want;
+      if (!st.paused) this.startT = setTimeout(() => { if (this.sync === sy && sy.state === st) { v.playbackRate = st.rate; this.play(true); } }, st.wall - now);
+      return;
+    }
+    if (jump && Math.abs(this.shownPos() - want) > 0.3) { v.currentTime = want; sy.seekAt = Date.now(); }
+    if (v.paused) this.play(true);
+  }
+  startSync(spec) {
+    this.sync = { err: null, rev: 0, ...spec };
     this.following = false;
     this.markSync();
   }
-  unsync() {
+  unsync(quiet) {
     if (!this.sync) return;
     this.sync = null;
+    clearTimeout(this.startT);
     this.markSync();
     const v = this.el.video;
     v.playbackRate = this.prefs.speed || 1;
     this.following = !this.p?.replay && this.latency() < this.delay + 8;
-    this.toast("הצפייה המשותפת הופסקה");
+    if (!quiet) this.toast("יצאתם מהצפייה המשותפת");
     this.o.onUnsync?.();
   }
   syncStep() {
     const v = this.el.video, sy = this.sync;
-    if (!sy || !this.readyDone || v.paused || v.seeking || v.readyState < 3 || this.offset == null) return;
-    if (Date.now() - (sy.seekAt || 0) < 700) return;
-    const [s, e] = this.range();
-    const target = this.posOf(this.syncNow() - sy.lag);
-    const lo = s + 0.5, hi = Math.max(lo, e - 1.5);
-    const want = clamp(target, lo, hi);
-    const diff = want - this.shownPos();          // חיובי = אנחנו מאחור
-    const real = target - this.shownPos();
-    sy.err = sy.err == null ? Math.abs(real) : sy.err * 0.85 + Math.abs(real) * 0.15;
-    sy.diff = real;
-    if (Math.abs(diff) > 1.5) {
-      // קפיצה: מוסיפים את זמן הקפיצה המשוער כדי לנחות קרוב, והשאר מתוקן במהירות
-      sy.seekCost = sy.seekCost ?? 0.25;
-      v.currentTime = Math.min(hi, want + sy.seekCost);
-      sy.seekAt = Date.now();
-      v.playbackRate = 1;
+    if (!sy || !this.readyDone || this.offset == null || v.seeking) return;
+    const st = sy.state, now = this.syncNow();
+    if (st.paused || now < st.wall) { if (st.paused && !v.paused) v.pause(); if (st.paused) { sy.err = 0; sy.diff = 0; } sy.i = 0; sy.lastStep = 0; return; }
+    if (v.paused) {
+      // הדפדפן עצר (או שלא אישר ניגון אוטומטי) - מנסים לחזור, לא יותר מפעם ב-3 שניות
+      if (Date.now() - (sy.playTry || 0) > 3000) { sy.playTry = Date.now(); this.play(false); }
       return;
     }
-    let rate = 1;
-    if (Math.abs(diff) > 0.004) rate = 1 + clamp(diff * 0.8, -0.1, 0.1);
-    if (rate > 1 && this.bufferAhead() < 0.6) rate = 1;
+    if (v.readyState < 3) return;
+    if (Date.now() - (sy.seekAt || 0) < 700) return;
+    const [s, e] = this.range();
+    const target = this.posOf(this.syncAbs(now));
+    const lo = s + 0.5, hi = Math.max(lo, e - 1.5);
+    const want = clamp(target, lo, hi);
+    const shown = this.shownPos();
+    const diff = want - shown;          // חיובי = אנחנו מאחור
+    const real = target - shown;
+    sy.err = sy.err == null ? Math.abs(real) : sy.err * 0.85 + Math.abs(real) * 0.15;
+    sy.diff = real;
+    const base = st.rate || 1;
+    if (Math.abs(diff) > 1.5) {
+      // קפיצה: מוסיפים את זמן הקפיצה המשוער כדי לנחות קרוב, והשאר מתוקן במהירות
+      v.currentTime = Math.min(hi, want + 0.25 * base);
+      sy.seekAt = Date.now(); sy.i = 0; sy.lastStep = 0;
+      v.playbackRate = base;
+      return;
+    }
+    // בקר PI: חלק יחסי מתקן מהר, חלק מצטבר מעלים סטייה קבועה קטנה (למשל מכשיר שמנגן מעט לאט)
+    const dt = sy.lastStep ? Math.min(1, (performance.now() - sy.lastStep) / 1000) : 0.25;
+    sy.lastStep = performance.now();
+    sy.i = clamp((sy.i || 0) + diff * dt, -0.15, 0.15);
+    let rate = base * (1 + clamp(diff * 0.8 + sy.i * 0.25, -0.1, 0.1));
+    if (Math.abs(diff) < 0.004 && Math.abs(sy.i) < 0.01) rate = base;
+    if (rate > base && this.bufferAhead() < 0.6) rate = base;
     rate = Math.round(rate * 1000) / 1000;
     if (Math.abs(v.playbackRate - rate) > 0.0005) v.playbackRate = rate;
   }
@@ -907,11 +1012,15 @@ export class Player {
     this.el.syncb.lastChild.textContent = txt;
   }
   async share() {
-    const abs = this.absOf(this.shownPos());
+    const abs = this.curAbs();
     if (abs == null || !this.readyDone || !this.o.shareUrl) { this.toast("אפשר ליצור קישור רק כשהשידור מתנגן"); return; }
-    const lag = this.sync ? this.sync.lag : Math.max(0, Math.round(this.syncNow() - abs));
-    const { url, ready } = this.o.shareUrl(lag, !!this.sync);
-    if (!this.sync) { if (this.el.video.paused) this.play(true); this.startSync(lag); }
+    const v = this.el.video;
+    // מצב החדר: מה שמוצג אצל השולח עכשיו
+    const st = this.sync?.mode === "room" ? this.sync.state
+      : { wall: this.syncNow(), abs, rate: 1, paused: false };
+    const { url, ready, host } = this.o.shareUrl(st, this.sync?.mode === "room");
+    if (this.sync?.mode !== "room") { if (v.paused) this.play(true); this.startSync({ mode: "room", host: true, state: st }); }
+    else if (host != null) this.sync.host = host;
     const copy = async u => {
       try { await navigator.clipboard.writeText(u); return true; } catch (e) {
         try {
@@ -933,15 +1042,26 @@ export class Player {
                       : "<b>🔗 הקישור מוכן.</b> כל מי שייכנס אליו יראה בדיוק את מה שאתם רואים.");
     // החדר נשמר במסד הנתונים ברקע. אם זה נכשל - קישור חלופי שלא תלוי במסד
     try { await ready; } catch (e) {
+      if (this.sync?.mode === "room" && this.sync.host && this.sync.rev === 0) this.sync.mode = "link";
       const alt = e && e.fallbackUrl;
       if (alt) this.banner("<b>לא הצלחנו לשמור את החדר.</b> הקישור הקודם לא יעבוד, השתמשו בזה במקומו:",
         [["העתקת קישור חלופי", async () => offer(alt, await copy(alt), "<b>🔗 הקישור החלופי הועתק.</b>"), true], ["סגירה", () => {}]], 20000);
     }
   }
   syncInfo() {
-    this.banner("<b>צפייה משותפת פעילה.</b> כל לחיצה על ניגון/השהיה, דילוג או \"לשידור החי\" תפסיק אותה אצלכם.",
-      [["העתקת הקישור", () => this.share(), true], ["הפסקה", () => this.unsync()], ["סגירה", () => {}]], 10000);
+    const sy = this.sync; if (!sy) return;
+    if (sy.mode === "room" && sy.host)
+      this.banner("<b>אתם שולטים בצפייה המשותפת.</b> כל מה שתעשו (עצירה, דילוג, \"לשידור החי\", מהירות) קורה אצל כולם.",
+        [["העתקת הקישור", () => this.share(), true], ["סיום לכולם", () => { this.o.onHostEnd?.(); this.unsync(true); this.toast("הצפייה המשותפת הסתיימה"); }], ["סגירה", () => {}]], 12000);
+    else if (sy.mode === "room")
+      this.banner("<b>צפייה משותפת.</b> מי ששיתף את הקישור שולט בניגון, ואתם רואים בדיוק את מה שהוא רואה.",
+        [["העתקת הקישור", () => this.share()], ["יציאה מהצפייה המשותפת", () => this.unsync(), true], ["סגירה", () => {}]], 12000);
+    else
+      this.banner("<b>צפייה משותפת (קישור חלופי).</b> כל פעולה ידנית תפסיק אותה אצלכם.",
+        [["הפסקה", () => this.unsync(), true], ["סגירה", () => {}]], 10000);
   }
+  // הבעלים סיים את הצפייה המשותפת
+  syncEnded() { if (this.sync && !this.sync.host) { this.unsync(true); this.toast("מי ששיתף סיים את הצפייה המשותפת"); } }
 
   // ---------- מסך דולק ומדיה ----------
   async wake() { try { if ("wakeLock" in navigator && !this.lock) { this.lock = await navigator.wakeLock.request("screen"); this.lock.addEventListener("release", () => { this.lock = null; }); } } catch (e) {} }
@@ -951,8 +1071,8 @@ export class Player {
     try {
       navigator.mediaSession.metadata = new MediaMetadata({ title: this.p?.title || "שידור חי", artist: "שידור חי" });
       const step = +this.cfg.seekStep || 10;
-      navigator.mediaSession.setActionHandler("play", () => this.play(true));
-      navigator.mediaSession.setActionHandler("pause", () => { this.unsync(); this.el.video.pause(); });
+      navigator.mediaSession.setActionHandler("play", () => { if (this.sync?.host && this.sync.state.paused) this.toggle(); else this.play(true); });
+      navigator.mediaSession.setActionHandler("pause", () => { if (this.sync) { if (!this.el.video.paused) this.toggle(); } else this.el.video.pause(); });
       navigator.mediaSession.setActionHandler("seekbackward", () => this.skip(-step));
       navigator.mediaSession.setActionHandler("seekforward", () => this.skip(step));
     } catch (e) {}
@@ -960,7 +1080,7 @@ export class Player {
 
   destroyHls() { if (this.hls) { this.hls.destroy(); this.hls = null; } }
   destroy() {
-    clearInterval(this.syncT); this.sync = null;
+    clearInterval(this.syncT); clearTimeout(this.startT); this.sync = null;
     this.revokeVod();
     this.destroyHls();
     this.timers.forEach(clearInterval);

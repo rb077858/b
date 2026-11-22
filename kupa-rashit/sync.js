@@ -6,8 +6,9 @@
 //      (reembir.com/cdn-cgi/trace). השרת מחזיר שניות שלמות, ולכן שולחים בקשות בדיוק
 //      סביב "תקתוק" השנייה ומצמצמים את טווח האפשרויות (חיפוש בינארי). התוצאה: דיוק של
 //      אלפיות בודדות, ואותו שעון אצל כולם. אם אין חיבור - שעון המכשיר.
-//   2. חדר: kr_sync/<מזהה> במסד הנתונים שומר את ה"פיגור" (lag) מהזמן האמיתי.
-//      הרגע שצריך להיות על המסך = השעון המשותף פחות lag. כל צד מחשב ומתקן לבד.
+//   2. חדר: kr_sync/<מזהה> במסד הנתונים שומר את מצב הניגון של מי ששיתף (הבעלים):
+//      איפה התוכן היה ברגע מסוים, באיזה קצב, ואם הוא עצור. כל צד מחשב מזה איפה צריך
+//      להיות עכשיו ומתקן לבד. הבעלים משנה = משתנה אצל כולם. אורח לא יכול לשנות (רק לצאת).
 //   3. נוכחות: כל צופה מעדכן kr_sync/<מזהה>/peers/<צופה> כל 15 שניות (עם הסטייה שלו),
 //      וכך רואים כמה צופים מחוברים ועד כמה הם צמודים.
 // =====================================================================
@@ -84,13 +85,33 @@ export function keepClockFresh() {
 }
 
 // ---------- מסד נתונים ----------
-let fsP = null;
+// חדר: kr_sync/<מזהה> = { owner, wall, abs, rate, paused, ended, rev }
+//   מצב הניגון של החדר: ברגע wall (בשעון המשותף) התוכן היה ב-abs (זמן אמיתי של השידור),
+//   ומאז הוא מתקדם בקצב rate. paused = עצור על abs. wall בעתיד = כולם מחכים ומתחילים יחד.
+//   רק הבעלים (משתמש אנונימי שיצר את החדר) יכול לשנות. rev עולה ב-1 בכל שינוי.
+let fsP = null, authP = null;
 function F() {
   return fsP ||= (async () => {
-    const { db, SDK } = await import(`../firebase/config.js?v=${CFG_V}`);
+    const { app, db, SDK } = await import(`../firebase/config.js?v=${CFG_V}`);
     const m = await import(`${SDK}/firebase-firestore.js`);
-    return { db, ...m };
+    return { app, db, SDK, ...m };
   })();
+}
+function A() {
+  return authP ||= (async () => {
+    const f = await F();
+    const a = await import(`${f.SDK}/firebase-auth.js`);
+    const auth = a.getAuth(f.app);
+    await new Promise(r => { const u = a.onAuthStateChanged(auth, () => { u(); r(); }); });
+    return { auth, ...a };
+  })();
+}
+// המזהה של הדפדפן הזה (אם כבר נוצר), בלי ליצור חדש
+export async function myUid() { try { return (await A()).auth.currentUser?.uid || null; } catch (e) { return null; } }
+async function ensureUid() {
+  const a = await A();
+  if (!a.auth.currentUser) await a.signInAnonymously(a.auth);
+  return a.auth.currentUser.uid;
 }
 
 const ABC = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
@@ -99,9 +120,18 @@ export function randomId(n = 12) {
   return Array.from(a, x => ABC[x % ABC.length]).join("");
 }
 
-export async function createRoom(id, lag) {
+const clean = st => ({ wall: Math.round(st.wall), abs: Math.round(st.abs), rate: +st.rate || 1, paused: !!st.paused });
+
+export async function createRoom(id, st) {
+  const uid = await ensureUid();
   const f = await F();
-  await f.setDoc(f.doc(f.db, "kr_sync", id), { v: 2, lag: Math.round(lag), at: f.serverTimestamp() });
+  await f.setDoc(f.doc(f.db, "kr_sync", id), { v: 3, owner: uid, ...clean(st), ended: false, rev: 0, at: f.serverTimestamp() });
+  return uid;
+}
+
+export async function updateRoom(id, st, rev, ended = false) {
+  const f = await F();
+  await f.setDoc(f.doc(f.db, "kr_sync", id), { v: 3, owner: await ensureUid(), ...clean(st), ended, rev, at: f.serverTimestamp() });
 }
 
 export async function readRoom(id) {
@@ -109,7 +139,12 @@ export async function readRoom(id) {
   const s = await f.getDoc(f.doc(f.db, "kr_sync", id));
   if (!s.exists()) return null;
   const d = s.data();
-  return typeof d.lag === "number" ? d.lag : null;
+  return d.v === 3 && typeof d.abs === "number" ? d : null;
+}
+
+export async function watchRoom(id, cb) {
+  const f = await F();
+  return f.onSnapshot(f.doc(f.db, "kr_sync", id), s => { const d = s.data(); if (d && d.v === 3) cb(d); }, () => {});
 }
 
 // נוכחות בחדר
