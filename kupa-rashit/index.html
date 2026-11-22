@@ -190,6 +190,33 @@
     let player = null, playing = null;   // playing: { key, kind: live|replay|channel, win }
     const finished = new Set();          // שידורים שהסתיימו אצל הצופה (לא להפעיל שוב אוטומטית)
 
+    // ---------- קישור לצפייה משותפת ----------
+    // הקישור נושא בתוכו (אחרי #w=) רק את ה"פיגור" מהזמן האמיתי. בלי שרת ובלי מסד נתונים:
+    // כל מי שנכנס מחשב לבד את אותו רגע בדיוק, ונשאר צמוד אליו עד שהוא משנה משהו ידנית.
+    const b64u = str => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    const unb64u = str => decodeURIComponent(escape(atob(str.replace(/-/g, "+").replace(/_/g, "/"))));
+    function readShare() {
+      const m = /[#&]w=([A-Za-z0-9_-]+)/.exec(location.hash);
+      if (!m) return null;
+      try {
+        const j = JSON.parse(unb64u(m[1]));
+        const l = +j.l;
+        if (j.v === 1 && isFinite(l) && l > -60e3 && l < 12 * 3600e3) return { lag: Math.max(0, l) };
+      } catch (e) {}
+      return null;
+    }
+    function shareUrl(lag) {
+      const u = new URL(location.href);
+      u.searchParams.delete("preview");
+      u.hash = "w=" + b64u(JSON.stringify({ v: 1, l: lag }));
+      return u.href;
+    }
+    function clearShareHash() {
+      if (/[#&]w=/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search);
+    }
+    let shared = readShare();
+    window.addEventListener("hashchange", () => { const s = readShare(); if (s) { shared = s; stopPlayer(true); tick(); } });
+
     if (PREVIEW) {
       const tag = document.createElement("div");
       tag.className = "preview-tag"; tag.textContent = "תצוגה מקדימה";
@@ -293,6 +320,9 @@
     }
 
     const now = () => Date.now() + offset;
+    // לצפייה משותפת: שעון המכשיר (מסונכרן ברשת ומדויק יותר משעון האינטרנט, שהוא ברזולוציה של שנייה),
+    // אלא אם שעון המכשיר שגוי בבירור
+    const syncNow = () => Math.abs(offset) > 3000 ? Date.now() + offset : Date.now();
     const embed = () => cfg.player.mode !== "redirect";
 
     function replayCandidate(ms) {
@@ -304,9 +334,11 @@
     }
 
     // ---------- נגן ----------
-    async function startPlayer(win, kind) {
+    async function startPlayer(win, kind, syncLag = null) {
       const p = cfg.player;
       const nowMs = now();
+      // מעבר בין מצבים (למשל ערוץ -> תוכנית) לא מבטל צפייה משותפת
+      if (syncLag == null && player?.sync) syncLag = player.sync.lag;
       const key = win ? windowKey(win) : "channel";
       // "משדרים עכשיו" מהפאנל: אין תוכנית מהלוח (אין תאריך/שעה) - מנגנים את הערוץ
       const forcedStream = win?.forced ? win.stream : "";
@@ -319,11 +351,12 @@
       document.body.classList.add("watching");
       renderPlayerHead();
 
-      const { Player } = await import("./player.js?v=20261101h");
+      const { Player } = await import("./player.js?v=20261122a");
       if (!playing || playing.key !== key) return;
       player = new Player($("player"), {
         cfg: p, texts: cfg.texts, fallbackUrl: cfg.defaults.liveUrl,
-        onEnd: () => { finished.add(key); stopPlayer(); tick(); }
+        onEnd: () => { finished.add(key); stopPlayer(); tick(); },
+        now: syncNow, shareUrl, onUnsync: clearShareHash
       });
       const src = (win && win.stream) || forcedStream || p.source;
       const grace = (+p.endGraceMinutes || 0) * 60e3;
@@ -333,8 +366,12 @@
         if (p.afterEnd !== "continue" || kind === "replay") endAt = win.end + grace;
         startAt = kind === "replay" ? "start" : (p.joinMode || "ask");
       }
+      if (syncLag != null) {
+        startAt = syncNow() - syncLag;
+        dvrMs = Math.max(dvrMs, syncLag + 10 * 60e3);
+      }
       player.load({
-        src, dvrMs, startAt, endAt, replay: kind === "replay",
+        src, dvrMs, startAt, endAt, replay: kind === "replay", sync: syncLag,
         // צפייה חוזרת: רק בטווח התוכנית שהוגדר (התחלה עד סיום + זמן ההמתנה)
         clip: kind === "replay" ? { from: win.start, to: win.end + grace } : null,
         win: win ? { key, start: win.start, end: win.end } : null,
@@ -387,6 +424,30 @@
       let status = getStatus(cfg, ms);
       if (forcedState) status = fakeStatus(status, forcedState);
       const { state, next } = status;
+
+      // ---- נכנסו מקישור לצפייה משותפת ----
+      if (shared && embed() && !forcedState) {
+        if (!timeReady) { show({ title: t.loading || "טוען...", loading: true }); return; }
+        const sh = shared; shared = null;
+        const target = syncNow() - sh.lag;
+        const grace = (+cfg.player.endGraceMinutes || 0) * 60e3;
+        const inWin = w => w && target >= w.start - 5 * 60e3 && target <= w.end + grace;
+        let pick = null;
+        if (state === "live" && next && (next.forced || inWin(next))) pick = [next, "live"];
+        else {
+          const rc = replayCandidate(ms);
+          if (rc && inWin(rc)) pick = [rc, "replay"];
+          else if (state === "live" && next) pick = [next, "live"];
+          else if (cfg.player.alwaysOn && state !== "off") pick = [null, "channel"];
+        }
+        if (pick) {
+          if (playing) stopPlayer(true);
+          finished.delete(pick[0] ? windowKey(pick[0]) : "channel");
+          startPlayer(pick[0], pick[1], sh.lag);
+          return;
+        }
+        clearShareHash();
+      }
 
       // ---- מצב נגן מוטמע ----
       if (embed()) {

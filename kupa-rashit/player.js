@@ -3,6 +3,7 @@
 //  • השהיה אוטומטית: כל מכשיר מזהה כמה הוא נתקע ומגדיל/מקטין את ההשהיה בעצמו
 //  • חזרה אחורה (DVR) ו"מתחילת התוכנית"
 //  • איכות, מהירות, תמונה-בתוך-תמונה, מסך מלא, מקשי קיצור, נתונים טכניים
+//  • קישור לצפייה משותפת: כל מי שנכנס לקישור רואה בדיוק את אותו רגע, עד שמישהו משנה ידנית
 // =====================================================================
 
 const HLS_URL = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
@@ -42,7 +43,8 @@ const I = {
   pip: '<path d="M19 7h-8v6h8zm2-4H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H3V5h18z"/>',
   fs: '<path d="M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z"/>',
   fsx: '<path d="M5 16h3v3h2v-5H5zm3-8H5v2h5V5H8zm6 11h2v-3h3v-2h-5zm2-11V5h-2v5h5V8z"/>',
-  restart: '<path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>'
+  restart: '<path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/>',
+  link: '<path d="M10.6 13.4a1 1 0 0 1 0-1.4l3.5-3.5a1 1 0 1 1 1.4 1.4L12 13.4a1 1 0 0 1-1.4 0zM8.5 19.1a4 4 0 0 1-2.9-6.9l2.1-2.1a1 1 0 1 1 1.4 1.4L7 13.6a2 2 0 0 0 2.8 2.8l2.1-2.1a1 1 0 0 1 1.4 1.4l-2.1 2.1a4 4 0 0 1-2.7 1.3zm6.9-5.1a1 1 0 0 1-.7-1.7l2.3-2.3A2 2 0 0 0 14.2 7.2l-2.3 2.3a1 1 0 1 1-1.4-1.4l2.3-2.3a4 4 0 0 1 5.6 5.6l-2.3 2.3a1 1 0 0 1-.7.3z"/>'
 };
 const svg = (k, step) => `<svg viewBox="0 0 24 24" aria-hidden="true">${I[k].replace("STEP", step || "")}</svg>`;
 
@@ -60,7 +62,12 @@ function injectCss() {
   .kp button:focus-visible{outline:2px solid var(--kp-a)}
   .kp-shade{position:absolute;inset:auto 0 0 0;height:45%;background:linear-gradient(transparent,#000c);pointer-events:none;transition:opacity .25s}
   .kp-bar{position:absolute;left:0;right:0;bottom:0;padding:0 10px 6px;transition:opacity .25s,transform .25s}
-  .kp.idle .kp-bar,.kp.idle .kp-shade,.kp.idle .kp-top{opacity:0;pointer-events:none}
+  .kp.idle .kp-bar,.kp.idle .kp-shade,.kp.idle .kp-syncb{opacity:0;pointer-events:none}
+  .kp-syncb{position:absolute;top:12px;right:12px;direction:rtl;display:inline-flex;align-items:center;gap:6px;background:#000b!important;padding:6px 12px!important;border-radius:999px!important;font-size:13px;font-weight:600;transition:opacity .25s}
+  .kp-syncb i{width:8px;height:8px;border-radius:50%;background:#35d07f;box-shadow:0 0 0 0 #35d07f;animation:kpPulseG 1.8s infinite}
+  @keyframes kpPulseG{0%{box-shadow:0 0 0 0 #35d07faa}70%{box-shadow:0 0 0 6px #35d07f00}100%{box-shadow:0 0 0 0 #35d07f00}}
+  .kp.synced [data-a="share"]{color:#35d07f}
+  .kp.synced .kp-stats{top:50px}
   .kp.idle{cursor:none}
   .kp-row{display:flex;align-items:center;gap:2px}
   .kp-row .sp{flex:1}
@@ -137,6 +144,7 @@ export class Player {
     this.played = false;
     this.retries = 0;
     this.timers = [];
+    this.sync = null;       // { lag }: צפייה משותפת - הרגע המוצג = עכשיו פחות lag (זהה לכל מי שיש לו את הקישור)
     this.build();
     this.initDelay();
   }
@@ -178,6 +186,7 @@ export class Player {
         <div class="kp-shade"></div>
         <button class="kp-unmute hide">${svg("mute")} הקישו להפעלת הקול</button>
         <div class="kp-stats hide"></div>
+        <button class="kp-syncb hide" title="צפייה משותפת: אתם רואים בדיוק את מה שרואים כל מי שיש להם את הקישור"><i></i>צפייה משותפת</button>
         <div class="kp-toast"></div>
         <div class="kp-banner hide"></div>
         <div class="kp-menu hide"></div>
@@ -192,6 +201,7 @@ export class Player {
             <button data-a="live" class="kp-live"><i></i><span></span></button>
             <span class="sp"></span>
             <button data-a="restart" class="kp-hide-sm hide" aria-label="מתחילת התוכנית" title="מתחילת התוכנית">${svg("restart")}</button>
+            <button data-a="share" aria-label="קישור לצפייה משותפת" title="קישור לצפייה משותפת">${svg("link")}</button>
             <button data-a="menu" aria-label="הגדרות" title="הגדרות">${svg("gear")}</button>
             <button data-a="pip" class="kp-hide-sm" aria-label="תמונה בתוך תמונה" title="תמונה בתוך תמונה">${svg("pip")}</button>
             <button data-a="fs" aria-label="מסך מלא" title="מסך מלא">${svg("fs")}</button>
@@ -205,7 +215,7 @@ export class Player {
       seek: q(".kp-seek"), buf: q(".kp-buf"), prog: q(".kp-prog"), thumb: q(".kp-thumb"), tip: q(".kp-tip"), mark: q(".kp-mark"),
       time: q(".kp-time"), live: q(".kp-live"), liveTxt: q(".kp-live span"), vol: q(".kp-vol input"),
       play: q('[data-a="play"]'), mute: q('[data-a="mute"]'), fs: q('[data-a="fs"]'), pip: q('[data-a="pip"]'), restart: q('[data-a="restart"]'),
-      tapL: q(".kp-tap.l"), tapR: q(".kp-tap.r")
+      tapL: q(".kp-tap.l"), tapR: q(".kp-tap.r"), syncb: q(".kp-syncb")
     };
     const v = this.el.video;
     v.volume = this.prefs.volume; v.muted = this.prefs.muted;
@@ -216,9 +226,10 @@ export class Player {
       const b = e.target.closest("[data-a]"); if (!b) return;
       e.stopPropagation();
       ({ play: () => this.toggle(), back: () => this.skip(-step), fwd: () => this.skip(step), mute: () => this.toggleMute(),
-         live: () => this.goLive(true), restart: () => this.fromStart(), menu: () => this.toggleMenu(), pip: () => this.togglePip(), fs: () => this.toggleFs() })[b.dataset.a]?.();
+         live: () => this.goLive(true), restart: () => this.fromStart(), menu: () => this.toggleMenu(), share: () => this.share(), pip: () => this.togglePip(), fs: () => this.toggleFs() })[b.dataset.a]?.();
       this.poke();
     });
+    this.el.syncb.onclick = e => { e.stopPropagation(); this.syncInfo(); };
     this.el.big.onclick = e => { e.stopPropagation(); this.play(true); };
     this.el.unmute.onclick = e => { e.stopPropagation(); v.muted = false; this.prefs.muted = false; if (v.volume === 0) v.volume = 1; this.savePrefs(); this.el.unmute.classList.add("hide"); this.syncUi(); };
     this.el.vol.oninput = () => { v.volume = +this.el.vol.value; v.muted = v.volume === 0; this.prefs.volume = v.volume || this.prefs.volume; this.prefs.muted = v.muted; this.savePrefs(); this.syncUi(); };
@@ -292,7 +303,9 @@ export class Player {
    */
   async load(p) {
     this.p = p;
-    this.following = true;
+    if (p.sync != null) this.sync = { lag: p.sync };
+    this.markSync();
+    this.following = !this.sync;
     this.offset = null;
     this.readyDone = false;
     this.played = false;
@@ -461,7 +474,8 @@ export class Player {
 
     let target = null;
     {
-      if (typeof p.startAt === "number" && this.offset != null) target = this.posOf(p.startAt);
+      if (this.sync && this.offset != null) target = this.posOf(this.syncNow() - this.sync.lag);
+      else if (typeof p.startAt === "number" && this.offset != null) target = this.posOf(p.startAt);
       else if (p.startAt === "start" && win && this.offset != null) target = this.posOf(win.start);
     }
     if (target != null) {
@@ -477,7 +491,7 @@ export class Player {
       const startPos = this.posOf(win.start);
       if (startPos > s + 1) this.el.restart.classList.remove("hide");
       const sinceMin = (now - win.start) / 60000;
-      if (p.startAt === "ask" && sinceMin > 2 && startPos > s + 1 && !p.replay) {
+      if (p.startAt === "ask" && !this.sync && sinceMin > 2 && startPos > s + 1 && !p.replay) {
         this.banner(`<b>התוכנית התחילה לפני ${Math.round(sinceMin)} דקות</b>`,
           [["מההתחלה", () => this.fromStart(), true], ["המשך בשידור החי", () => {}]]);
       }
@@ -501,9 +515,10 @@ export class Player {
     }
     if (v.muted && !this.prefs.muted) this.el.unmute.classList.remove("hide");
   }
-  toggle() { const v = this.el.video; if (v.paused) { if (this.following && this.latency() > this.delay + 20) this.following = false; this.play(true); } else v.pause(); }
+  toggle() { const v = this.el.video; if (!v.paused) this.unsync(); if (v.paused) { if (this.following && this.latency() > this.delay + 20) this.following = false; this.play(true); } else v.pause(); }
   toggleMute() { const v = this.el.video; v.muted = !v.muted; if (!v.muted && v.volume === 0) v.volume = 1; this.prefs.muted = v.muted; this.savePrefs(); this.el.unmute.classList.add("hide"); }
   skip(sec, tap) {
+    this.unsync();
     const v = this.el.video, [s, e] = this.range();
     const t = clamp(v.currentTime + sec, s + (this.p?.clip ? 0 : 0.5), e - (this.p?.replay ? 0.5 : Math.min(this.delay, 4)));
     v.currentTime = t;
@@ -512,9 +527,10 @@ export class Player {
     if (tap) { const el = sec < 0 ? this.el.tapL : this.el.tapR; el.textContent = (sec < 0 ? "−" : "+") + Math.abs(sec); el.classList.add("show"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("show"), 600); }
     this.syncUi();
   }
-  seekAbs(abs) { const p = this.posOf(abs); if (p == null) return; const [s, e] = this.range(); this.el.video.currentTime = clamp(p, s + 0.5, e - 2); this.following = e - p < this.delay + 6; this.play(true); this.syncUi(); }
+  seekAbs(abs) { this.unsync(); const p = this.posOf(abs); if (p == null) return; const [s, e] = this.range(); this.el.video.currentTime = clamp(p, s + 0.5, e - 2); this.following = e - p < this.delay + 6; this.play(true); this.syncUi(); }
   goLive(user) {
     if (this.p?.replay) return;
+    if (user) this.unsync();
     const v = this.el.video;
     this.following = true;
     v.currentTime = Math.max(this.range()[0], this.edge() - this.delay);
@@ -575,6 +591,7 @@ export class Player {
   everySecond() {
     const v = this.el.video;
     if (!this.readyDone) return;
+    if (this.sync) { this.syncStep(); if (this.prefs.stats) this.renderStats(); this.syncUi(); return; }
     // יציבות: אם לא היו תקיעות 4 דקות, מקטינים בהדרגה את ההשהיה
     if (this.mode === "auto" && !v.paused && Date.now() - this.lastStallAt > 240e3 && Date.now() - this.lastAdjustAt > 240e3 && this.delay > this.dMin) {
       this.setDelay(Math.max(this.dMin, this.delay - 2)); this.lastAdjustAt = Date.now();
@@ -631,7 +648,7 @@ export class Player {
     const ba = this.bufferAhead();
     this.el.buf.style.width = clamp((cur + ba - s) / span, 0, 1) * 100 + "%";
     const lat = e - cur;
-    const atLive = !this.p?.replay && this.following && lat < this.delay + 8;
+    const atLive = !this.p?.replay && (this.following || !!this.sync) && lat < this.delay + 8;
     this.el.live.classList.toggle("on", atLive);
     const t = this.o.texts || {};
     this.el.liveTxt.textContent = atLive ? (t.liveBadge || "שידור חי") : "לשידור החי ›";
@@ -661,6 +678,7 @@ export class Player {
     const end = ev => {
       if (!this.dragging) return;
       this.dragging = false; sk.classList.remove("drag");
+      this.unsync();
       const pos = show(at(ev));
       const e = this.edge();
       if (!this.p?.replay && e - pos < this.delay + 6) this.goLive();
@@ -775,8 +793,9 @@ export class Player {
       if (d.m) return this.renderMenu(d.m);
       if (d.t === "stats") { this.prefs.stats = !this.prefs.stats; this.el.stats.classList.toggle("hide", !this.prefs.stats); this.renderStats(); }
       if (d.q) { this.prefs.quality = d.q; this.applyQuality(); }
-      if (d.s) { this.prefs.speed = +d.s; this.el.video.playbackRate = +d.s; if (+d.s > 1 && this.following && this.latency() < this.delay + 8) { this.toast("אתם כבר בשידור החי"); } }
+      if (d.s) { this.unsync(); this.prefs.speed = +d.s; this.el.video.playbackRate = +d.s; if (+d.s > 1 && this.following && this.latency() < this.delay + 8) { this.toast("אתם כבר בשידור החי"); } }
       if (d.d) {
+        this.unsync();
         if (d.d === "auto") { this.prefs.delayMode = "auto"; this.prefs.delay = null; this.mode = "auto"; this.initDelay(); }
         else { this.prefs.delayMode = "fixed"; this.prefs.delay = +d.d; this.mode = "fixed"; this.delay = +d.d; }
         if (this.following) this.goLive();
@@ -804,8 +823,74 @@ export class Player {
       `dvr       ${dur(e - s)}`,
       q ? `dropped   ${q.droppedVideoFrames}/${q.totalVideoFrames}` : "",
       `rate      ${v.playbackRate.toFixed(2)}x`,
+      this.sync ? `sync      lag ${(this.sync.lag / 1000).toFixed(1)}s, off ${(this.sync.diff || 0).toFixed(2)}s` : "",
       `engine    ${h ? "hls.js" : "native"}`
     ].filter(Boolean).join("\n");
+  }
+
+  // ---------- צפייה משותפת ----------
+  // אין שרת ואין מסד נתונים: הקישור מכיל רק "כמה זמן אחרי הזמן האמיתי" רואים (lag).
+  // כל צד מחשב לבד: הרגע שצריך להיות על המסך = השעה עכשיו פחות lag, ומתקן סטיות כל שנייה.
+  // שעון המכשירים מסונכרן ברשת, ולכן כל הצדדים רואים את אותו רגע.
+  syncNow() { return this.o.now ? this.o.now() : Date.now(); }
+  markSync() {
+    this.el.box.classList.toggle("synced", !!this.sync);
+    this.el.syncb.classList.toggle("hide", !this.sync);
+  }
+  startSync(lag) {
+    this.sync = { lag };
+    this.following = false;
+    this.markSync();
+  }
+  unsync() {
+    if (!this.sync) return;
+    this.sync = null;
+    this.markSync();
+    const v = this.el.video;
+    v.playbackRate = this.prefs.speed || 1;
+    this.following = !this.p?.replay && this.latency() < this.delay + 8;
+    this.toast("הצפייה המשותפת הופסקה");
+    this.o.onUnsync?.();
+  }
+  syncStep() {
+    const v = this.el.video;
+    if (v.paused || v.seeking || this.offset == null) return;
+    const [s, e] = this.range();
+    const target = this.posOf(this.syncNow() - this.sync.lag);
+    const lo = s + 0.5, hi = Math.max(lo, e - 1.5);
+    const want = clamp(target, lo, hi);
+    const diff = want - v.currentTime;          // חיובי = אנחנו מאחור
+    this.sync.diff = target - v.currentTime;
+    if (Math.abs(diff) > 4) { v.currentTime = want; v.playbackRate = 1; return; }
+    let rate = 1;
+    if (Math.abs(diff) > 0.12) rate = 1 + clamp(diff * 0.5, -0.15, 0.15);
+    if (rate > 1 && this.bufferAhead() < 1) rate = 1;
+    if (Math.abs(v.playbackRate - rate) > 0.001) v.playbackRate = rate;
+  }
+  async share() {
+    const abs = this.absOf(this.el.video.currentTime);
+    if (abs == null || !this.readyDone || !this.o.shareUrl) { this.toast("אפשר ליצור קישור רק כשהשידור מתנגן"); return; }
+    const lag = this.sync ? this.sync.lag : Math.max(0, Math.round(this.syncNow() - abs));
+    const url = this.o.shareUrl(lag);
+    if (!this.sync) { if (this.el.video.paused) this.play(true); this.startSync(lag); }
+    let ok = false;
+    try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = url; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;opacity:0;top:0;left:0";
+        document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); ta.remove();
+      } catch (e2) {}
+    }
+    const btns = [];
+    if (navigator.share) btns.push(["שליחה...", () => navigator.share({ url }).catch(() => {}), !ok]);
+    if (!ok) btns.push(["הצגת הקישור", () => prompt("העתיקו את הקישור:", url), !navigator.share]);
+    btns.push(["סגירה", () => {}]);
+    this.banner(ok ? "<b>🔗 הקישור הועתק!</b> כל מי שייכנס אליו יראה בדיוק את מה שאתם רואים, באותה שנייה."
+                   : "<b>🔗 הקישור מוכן.</b> כל מי שייכנס אליו יראה בדיוק את מה שאתם רואים.", btns, 12000);
+  }
+  syncInfo() {
+    this.banner("<b>צפייה משותפת פעילה.</b> כל לחיצה על ניגון/השהיה, דילוג או \"לשידור החי\" תפסיק אותה אצלכם.",
+      [["העתקת הקישור", () => this.share(), true], ["הפסקה", () => this.unsync()], ["סגירה", () => {}]], 10000);
   }
 
   // ---------- מסך דולק ומדיה ----------
@@ -817,7 +902,7 @@ export class Player {
       navigator.mediaSession.metadata = new MediaMetadata({ title: this.p?.title || "שידור חי", artist: "שידור חי" });
       const step = +this.cfg.seekStep || 10;
       navigator.mediaSession.setActionHandler("play", () => this.play(true));
-      navigator.mediaSession.setActionHandler("pause", () => this.el.video.pause());
+      navigator.mediaSession.setActionHandler("pause", () => { this.unsync(); this.el.video.pause(); });
       navigator.mediaSession.setActionHandler("seekbackward", () => this.skip(-step));
       navigator.mediaSession.setActionHandler("seekforward", () => this.skip(step));
     } catch (e) {}
