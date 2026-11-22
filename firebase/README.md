@@ -8,6 +8,7 @@
 | `firestore.rules` | חוקי אבטחה: קריאה ציבורית ל-`sites/*`, כתיבה רק ל-rb077858@gmail.com. כולל גם את האוספים `rm_*` של "שותפים לחדר" (ראו `bchira/README.md`) |
 | (אוספים `ch_*`) | "תורנויות חדר": חדרים ותורנויות (ראו `cheder/README.md`) |
 | (אוסף `memes`) | הממים שנשלחו מ-`memes/`: כל אחד יוצר, רק אדמין קורא/עורך/מוחק (ראו `memes/README.md`) |
+| (אוסף `kr_sync`) | צפייה משותפת של קופה ראשית: חדר (פיגור בלבד, לא משתנה) + `peers` לנוכחות. כל אחד יוצר, מי שיש לו את המזהה קורא |
 | `rules-test/` | בדיקות לחוקים מול אמולטור |
 
 ## מבנה הנתונים
@@ -20,5 +21,5 @@
 
 ## פריסת חוקים מחדש
 ```
-npx firebase-tools deploy --only firestore:rules
+npx firebase-tools deploy --only firestore:rules --project reembir-b-b65b76
 ```

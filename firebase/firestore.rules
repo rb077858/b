@@ -403,6 +403,36 @@ service cloud.firestore {
       allow delete: if isAdmin() || (chMember() && resource.data.by == chEmail() && resource.data.status == 'open');
     }
 
+    // =================================================================
+    //  צפייה משותפת (kupa-rashit) - kr_sync/<חדר>
+    //  החדר נוצר פעם אחת ולא משתנה: רק ה"פיגור" (lag, באלפיות) מהזמן האמיתי.
+    //  מי שיש לו את הקישור (מזהה אקראי) קורא. אין רשימה של כל החדרים.
+    //  peers: נוכחות - כל צופה מעדכן את עצמו כל 15 שניות (מתי + הסטייה שלו)
+    // =================================================================
+    match /kr_sync/{room} {
+      allow get: if true;
+      allow create: if room.matches('[A-Za-z0-9]{10,32}')
+        && request.resource.data.keys().hasOnly(['v', 'lag', 'at'])
+        && request.resource.data.keys().hasAll(['v', 'lag', 'at'])
+        && request.resource.data.v == 2
+        && request.resource.data.lag is number
+        && request.resource.data.lag >= 0 && request.resource.data.lag <= 43200000
+        && request.resource.data.at == request.time;
+
+      match /peers/{pid} {
+        allow read: if true;
+        allow create, update: if pid.matches('[A-Za-z0-9]{8,32}')
+          && request.resource.data.keys().hasOnly(['at', 'err', 'host'])
+          && request.resource.data.keys().hasAll(['at', 'err', 'host'])
+          && request.resource.data.at == request.time
+          && request.resource.data.err is number
+          && request.resource.data.err >= 0 && request.resource.data.err <= 3600000
+          && request.resource.data.host is bool
+          && exists(/databases/$(database)/documents/kr_sync/$(room));
+        allow delete: if true;
+      }
+    }
+
     // כל השאר - אדמין בלבד
     match /{document=**} {
       allow read, write: if isAdmin();

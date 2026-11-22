@@ -186,7 +186,7 @@ export class Player {
         <div class="kp-shade"></div>
         <button class="kp-unmute hide">${svg("mute")} הקישו להפעלת הקול</button>
         <div class="kp-stats hide"></div>
-        <button class="kp-syncb hide" title="צפייה משותפת: אתם רואים בדיוק את מה שרואים כל מי שיש להם את הקישור"><i></i>צפייה משותפת</button>
+        <button class="kp-syncb hide" title="צפייה משותפת: אתם רואים בדיוק את מה שרואים כל מי שיש להם את הקישור"><i></i><span>צפייה משותפת</span></button>
         <div class="kp-toast"></div>
         <div class="kp-banner hide"></div>
         <div class="kp-menu hide"></div>
@@ -591,7 +591,7 @@ export class Player {
   everySecond() {
     const v = this.el.video;
     if (!this.readyDone) return;
-    if (this.sync) { this.syncStep(); if (this.prefs.stats) this.renderStats(); this.syncUi(); return; }
+    if (this.sync) { if (this.prefs.stats) this.renderStats(); this.syncUi(); return; }
     // יציבות: אם לא היו תקיעות 4 דקות, מקטינים בהדרגה את ההשהיה
     if (this.mode === "auto" && !v.paused && Date.now() - this.lastStallAt > 240e3 && Date.now() - this.lastAdjustAt > 240e3 && this.delay > this.dMin) {
       this.setDelay(Math.max(this.dMin, this.delay - 2)); this.lastAdjustAt = Date.now();
@@ -823,22 +823,44 @@ export class Player {
       `dvr       ${dur(e - s)}`,
       q ? `dropped   ${q.droppedVideoFrames}/${q.totalVideoFrames}` : "",
       `rate      ${v.playbackRate.toFixed(2)}x`,
-      this.sync ? `sync      lag ${(this.sync.lag / 1000).toFixed(1)}s, off ${(this.sync.diff || 0).toFixed(2)}s` : "",
+      this.sync ? `sync      lag ${(this.sync.lag / 1000).toFixed(2)}s, off ${((this.sync.diff || 0) * 1000).toFixed(0)}ms, avg ${((this.sync.err || 0) * 1000).toFixed(0)}ms` : "",
+      this.sync && this.o.clockInfo ? `clock     ${this.o.clockInfo()}` : "",
       `engine    ${h ? "hls.js" : "native"}`
     ].filter(Boolean).join("\n");
   }
 
   // ---------- צפייה משותפת ----------
-  // אין שרת ואין מסד נתונים: הקישור מכיל רק "כמה זמן אחרי הזמן האמיתי" רואים (lag).
-  // כל צד מחשב לבד: הרגע שצריך להיות על המסך = השעה עכשיו פחות lag, ומתקן סטיות כל שנייה.
-  // שעון המכשירים מסונכרן ברשת, ולכן כל הצדדים רואים את אותו רגע.
+  // הרגע שצריך להיות על המסך = שעון משותף (o.now, מדויק לאלפיות) פחות lag.
+  // כל רבע שנייה מודדים איזו תמונה מוצגת *ממש עכשיו* (requestVideoFrameCallback: זמן המדיה של
+  // התמונה + מתי היא הוצגה), ומתקנים בשינוי מהירות זעיר (עד ±10%). סטייה גדולה = קפיצה.
   syncNow() { return this.o.now ? this.o.now() : Date.now(); }
   markSync() {
     this.el.box.classList.toggle("synced", !!this.sync);
     this.el.syncb.classList.toggle("hide", !this.sync);
+    clearInterval(this.syncT);
+    if (this.sync) {
+      this.syncT = setInterval(() => this.syncStep(), 250);
+      this.watchFrames();
+    }
+  }
+  watchFrames() {
+    const v = this.el.video;
+    if (!v.requestVideoFrameCallback || this.rvfc) return;
+    this.rvfc = true;
+    const cb = (now, md) => {
+      this.frame = { media: md.mediaTime, at: md.expectedDisplayTime || now };
+      if (this.sync) v.requestVideoFrameCallback(cb); else this.rvfc = false;
+    };
+    v.requestVideoFrameCallback(cb);
+  }
+  // המיקום שמוצג כרגע על המסך (בשניות של הנגן)
+  shownPos() {
+    const v = this.el.video, f = this.frame, p = performance.now();
+    if (f && !v.paused && p - f.at < 250 && p - f.at > -100) return f.media + ((p - f.at) / 1000) * v.playbackRate;
+    return v.currentTime;
   }
   startSync(lag) {
-    this.sync = { lag };
+    this.sync = { lag, err: null };
     this.following = false;
     this.markSync();
   }
@@ -853,40 +875,68 @@ export class Player {
     this.o.onUnsync?.();
   }
   syncStep() {
-    const v = this.el.video;
-    if (v.paused || v.seeking || this.offset == null) return;
+    const v = this.el.video, sy = this.sync;
+    if (!sy || !this.readyDone || v.paused || v.seeking || v.readyState < 3 || this.offset == null) return;
+    if (Date.now() - (sy.seekAt || 0) < 700) return;
     const [s, e] = this.range();
-    const target = this.posOf(this.syncNow() - this.sync.lag);
+    const target = this.posOf(this.syncNow() - sy.lag);
     const lo = s + 0.5, hi = Math.max(lo, e - 1.5);
     const want = clamp(target, lo, hi);
-    const diff = want - v.currentTime;          // חיובי = אנחנו מאחור
-    this.sync.diff = target - v.currentTime;
-    if (Math.abs(diff) > 4) { v.currentTime = want; v.playbackRate = 1; return; }
+    const diff = want - this.shownPos();          // חיובי = אנחנו מאחור
+    const real = target - this.shownPos();
+    sy.err = sy.err == null ? Math.abs(real) : sy.err * 0.85 + Math.abs(real) * 0.15;
+    sy.diff = real;
+    if (Math.abs(diff) > 1.5) {
+      // קפיצה: מוסיפים את זמן הקפיצה המשוער כדי לנחות קרוב, והשאר מתוקן במהירות
+      sy.seekCost = sy.seekCost ?? 0.25;
+      v.currentTime = Math.min(hi, want + sy.seekCost);
+      sy.seekAt = Date.now();
+      v.playbackRate = 1;
+      return;
+    }
     let rate = 1;
-    if (Math.abs(diff) > 0.12) rate = 1 + clamp(diff * 0.5, -0.15, 0.15);
-    if (rate > 1 && this.bufferAhead() < 1) rate = 1;
-    if (Math.abs(v.playbackRate - rate) > 0.001) v.playbackRate = rate;
+    if (Math.abs(diff) > 0.004) rate = 1 + clamp(diff * 0.8, -0.1, 0.1);
+    if (rate > 1 && this.bufferAhead() < 0.6) rate = 1;
+    rate = Math.round(rate * 1000) / 1000;
+    if (Math.abs(v.playbackRate - rate) > 0.0005) v.playbackRate = rate;
+  }
+  setSyncPeers(peers, me) {
+    const n = peers.length;
+    const worst = peers.reduce((m, p) => Math.max(m, p.id === me ? (this.sync?.err ?? 0) * 1000 : p.err || 0), 0);
+    const txt = `צפייה משותפת${n > 1 ? ` · ${n} צופים` : ""}${this.sync?.err != null ? ` · סטייה ${(worst / 1000).toFixed(2)} שנ׳` : ""}`;
+    this.el.syncb.lastChild.textContent = txt;
   }
   async share() {
-    const abs = this.absOf(this.el.video.currentTime);
+    const abs = this.absOf(this.shownPos());
     if (abs == null || !this.readyDone || !this.o.shareUrl) { this.toast("אפשר ליצור קישור רק כשהשידור מתנגן"); return; }
     const lag = this.sync ? this.sync.lag : Math.max(0, Math.round(this.syncNow() - abs));
-    const url = this.o.shareUrl(lag);
+    const { url, ready } = this.o.shareUrl(lag, !!this.sync);
     if (!this.sync) { if (this.el.video.paused) this.play(true); this.startSync(lag); }
-    let ok = false;
-    try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
-      try {
-        const ta = document.createElement("textarea");
-        ta.value = url; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;opacity:0;top:0;left:0";
-        document.body.appendChild(ta); ta.select(); ok = document.execCommand("copy"); ta.remove();
-      } catch (e2) {}
+    const copy = async u => {
+      try { await navigator.clipboard.writeText(u); return true; } catch (e) {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = u; ta.setAttribute("readonly", ""); ta.style.cssText = "position:fixed;opacity:0;top:0;left:0";
+          document.body.appendChild(ta); ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok;
+        } catch (e2) { return false; }
+      }
+    };
+    const offer = (u, ok, head) => {
+      const btns = [];
+      if (navigator.share) btns.push(["שליחה...", () => navigator.share({ url: u }).catch(() => {}), !ok]);
+      if (!ok) btns.push(["הצגת הקישור", () => prompt("העתיקו את הקישור:", u), !navigator.share]);
+      btns.push(["סגירה", () => {}]);
+      this.banner(head, btns, 12000);
+    };
+    const ok = await copy(url);
+    offer(url, ok, ok ? "<b>🔗 הקישור הועתק!</b> כל מי שייכנס אליו יראה בדיוק את מה שאתם רואים, באותה שנייה."
+                      : "<b>🔗 הקישור מוכן.</b> כל מי שייכנס אליו יראה בדיוק את מה שאתם רואים.");
+    // החדר נשמר במסד הנתונים ברקע. אם זה נכשל - קישור חלופי שלא תלוי במסד
+    try { await ready; } catch (e) {
+      const alt = e && e.fallbackUrl;
+      if (alt) this.banner("<b>לא הצלחנו לשמור את החדר.</b> הקישור הקודם לא יעבוד, השתמשו בזה במקומו:",
+        [["העתקת קישור חלופי", async () => offer(alt, await copy(alt), "<b>🔗 הקישור החלופי הועתק.</b>"), true], ["סגירה", () => {}]], 20000);
     }
-    const btns = [];
-    if (navigator.share) btns.push(["שליחה...", () => navigator.share({ url }).catch(() => {}), !ok]);
-    if (!ok) btns.push(["הצגת הקישור", () => prompt("העתיקו את הקישור:", url), !navigator.share]);
-    btns.push(["סגירה", () => {}]);
-    this.banner(ok ? "<b>🔗 הקישור הועתק!</b> כל מי שייכנס אליו יראה בדיוק את מה שאתם רואים, באותה שנייה."
-                   : "<b>🔗 הקישור מוכן.</b> כל מי שייכנס אליו יראה בדיוק את מה שאתם רואים.", btns, 12000);
   }
   syncInfo() {
     this.banner("<b>צפייה משותפת פעילה.</b> כל לחיצה על ניגון/השהיה, דילוג או \"לשידור החי\" תפסיק אותה אצלכם.",
@@ -910,6 +960,7 @@ export class Player {
 
   destroyHls() { if (this.hls) { this.hls.destroy(); this.hls = null; } }
   destroy() {
+    clearInterval(this.syncT); this.sync = null;
     this.revokeVod();
     this.destroyHls();
     this.timers.forEach(clearInterval);
