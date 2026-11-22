@@ -116,6 +116,21 @@ eq("slacker gets more tasks", assigned.c.count > assigned.a.count && assigned.c.
 eq("slacker capped (not everything)", assigned.a.count > 0 && assigned.b.count > 0, true);
 eq("slacker load stays 0", assigned.c.load, 0);
 
+// יום השטיפה מתחלף בתור, ואף אחד לא שוטף פעמיים ברצף
+for (const n of [3, 4]) {
+  const ppl = ["a", "b", "c", "d"].slice(0, n).map(id => ({ id, name: id }));
+  let hm = []; const mops = [];
+  for (let i = 0; i < 7 * 4 * n; i++) {
+    const key = C.addDays("2026-09-06", i);
+    const { plan } = C.buildPlan({ key, room: "41", residents: ppl, absences: [], duty: i % 9 < 3 ? duty : null, history: hm.slice(-60), existing: null });
+    hm.push({ ...plan, done: Object.fromEntries(plan.tasks.map(t => [t, true])) });
+    if (plan.assign.mop) mops.push(plan.assign.mop);
+  }
+  const cnt = ppl.map(p => mops.filter(m => m === p.id).length);
+  eq(`mop rotates evenly (${n} people)`, Math.max(...cnt) - Math.min(...cnt) <= 1, true);
+  eq(`mop never twice in a row (${n} people)`, mops.some((m, i) => m === mops[i - 1]), false);
+}
+
 console.log("--- מאגר משותף");
 const sh = [{ date: "2026-11-16", floor: ["37"], kitchen: ["39"] }, { date: "2026-11-19", floor: ["50"], kitchen: [] }];
 const lo = [{ date: "2026-11-17", floor: ["41"], kitchen: [] }];

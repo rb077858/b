@@ -277,7 +277,10 @@ export function assignTasks({ tasks, present, history = [], key, keep = {} }) {
   const avg = rated.length ? rated.reduce((a, id) => a + st[id].load / st[id].days, 0) / rated.length : 0;
   const rate = id => (st[id].days > 0 ? st[id].load / st[id].days : avg);
   const today = Object.fromEntries(present.map(id => [id, 0]));
-  const prevDay = past.reduce((a, h) => (h.date > a ? h.date : a), "");
+  // התור של כל משימה: הפעם האחרונה שהייתה המשימה, וכמה פעמים כל אחד עשה אותה
+  const lastOcc = {};
+  for (const h of past) for (const t of h.tasks || []) if (!lastOcc[t] || h.date > lastOcc[t]) lastOcc[t] = h.date;
+  const did = (id, t) => st[id].tasks[t] || 0;
 
   for (const t of tasks) {
     const id = keep[t];
@@ -286,14 +289,17 @@ export function assignTasks({ tasks, present, history = [], key, keep = {} }) {
   const todo = tasks.filter(t => !assign[t]).sort((a, b) => W(b) - W(a) || tasks.indexOf(a) - tasks.indexOf(b));
   for (const t of todo) {
     let best = null, bestScore = Infinity;
+    const minDid = Math.min(...present.map(id => did(id, t)));
     for (const id of present) {
       const s = st[id];
       // "חוב": כמה פחות ממה שמצופה (לפי הימים שהיה) הוא עשה בפועל. מוגבל, כדי שלא יקבל הכל ביום אחד
       const owed = s.days > 0 ? Math.max(-2, Math.min(2, avg * s.days - s.load)) : 0;
       const score = (today[id] - owed * 0.5) * 100
         + rate(id) * 10
-        + (s.days ? (s.tasks[t] || 0) / s.days : 0) * 8
-        + (prevDay && s.last[t] === prevDay ? 15 : 0)
+        // תור: מי שעשה את המשימה הזו פחות פעמים מהאחרים - קודם; מי שעשה אותה בפעם הקודמת שהייתה - לא שוב
+        + (did(id, t) - minDid) * 45
+        + (lastOcc[t] && s.last[t] === lastOcc[t] ? 70 : 0)
+        - (s.last[t] ? Math.min(daysBetween(s.last[t], key), 60) : 60) / 10
         + (hash(`${key}|${t}|${id}`) % 1000) / 1000;
       if (score < bestScore) { bestScore = score; best = id; }
     }
