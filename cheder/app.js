@@ -8,8 +8,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, colorOf, initials, GOOGLE_SVG
-} from "./common.js?v=9";
-import * as C from "./core.js?v=9";
+} from "./common.js?v=10";
+import * as C from "./core.js?v=10";
 
 const { doc, collection, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, runTransaction, writeBatch, serverTimestamp, deleteField, arrayUnion, arrayRemove } = FS;
 
@@ -44,7 +44,7 @@ const legacyAbs = () => ((S.roomDoc && S.roomDoc.absences) || []).map(a => ({ ..
 const absences = () => [...legacyAbs(), ...S.absList];
 const events = () => C.mergeEvents(S.gEvents, S.roomDoc, S.room);
 const nameOf = id => (residents().find(r => r.id === id) || {}).name || "?";
-const history = before => Object.values(S.days).filter(d => d.date < before).sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
+const history = before => Object.values(S.days).filter(d => d.date < before).sort((a, b) => a.date.localeCompare(b.date)).slice(-60);
 const ctx = key => ({ key, room: S.room, residents: residents(), absences: absences(), duty: C.dutyFor(S.duties, key), history: history(key), settings: S.settings, events: events() });
 const fail = e => { console.error(e); toast(authError(e)); };
 const canEditPerson = rid => isManager() || rid === myRid();
