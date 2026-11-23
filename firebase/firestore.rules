@@ -344,7 +344,7 @@ service cloud.firestore {
       allow read: if isAdmin() || chMember();
       allow create: if isAdmin() || (chMember() && chIsManager()
         && request.resource.data.keys().hasOnly(['type', 'from', 'to', 'title', 'by', 'byRoom', 'at'])
-        && request.resource.data.type in ['off', 'on', 'mopmove', 'mop', 'nomop', 'noduty', 'note']
+        && request.resource.data.type in ['off', 'on', 'mopmove', 'mop', 'nomop', 'noduty', 'note', 'yeshiva']
         && request.resource.data.from is string
         && request.resource.data.get('title', '') is string
         && request.resource.data.get('title', '').size() <= 80

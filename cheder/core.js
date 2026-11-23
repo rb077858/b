@@ -43,7 +43,8 @@ export const DEFAULT_SETTINGS = {
   activeDays: [0, 1, 2, 3, 4, 5], // ראשון-שישי
   mopDay: 4,                       // חמישי
   outside: true,                   // "מחוץ לפנימייה" חלק מתורנות המטבחון
-  staleDays: 3                     // אחרי כמה ימים להזכיר לעדכן תורנות
+  staleDays: 3,                    // אחרי כמה ימים להזכיר לעדכן תורנות
+  sundayYeshiva: true              // ביום ראשון יש משימות רק אחרי שבת ישיבה
 };
 export const mergeSettings = s => ({ ...DEFAULT_SETTINGS, ...(s || {}) });
 
@@ -194,6 +195,7 @@ export const EVENT_TYPES = {
   mop:     { name: "יום שטיפה נוסף",             short: "יום שטיפה", icon: "" },
   nomop:   { name: "ביטול השטיפה",               short: "בלי שטיפה", icon: "" },
   noduty:  { name: "בלי תורנות קומה ומטבחון",    short: "בלי תורנות", icon: "" },
+  yeshiva: { name: "שבת ישיבה (ביום ראשון אחריה יש משימות)", short: "שבת ישיבה", icon: "" },
   on:      { name: "יום רגיל (גם אם בד\"כ אין)",  short: "יום רגיל", icon: "" },
   note:    { name: "הערה / הודעה",               short: "הערה", icon: "" }
 };
@@ -209,6 +211,9 @@ export function dayInfo(key, room, settings, events) {
   const evs = eventsOn(events, key, room);
   const has = t => evs.some(e => e.type === t);
   let active = s.activeDays.includes(wd);
+  // יום ראשון: רק אם השבת שלפניו הייתה שבת ישיבה
+  const afterYeshiva = wd === 0 && eventsOn(events, addDays(key, -1), room).some(e => e.type === "yeshiva");
+  if (wd === 0 && s.sundayYeshiva) active = afterYeshiva;
   if (has("on")) active = true;
   const off = evs.find(e => e.type === "off") || null;
   if (off) active = false;
@@ -216,7 +221,7 @@ export function dayInfo(key, room, settings, events) {
   for (const e of evs) if (e.type === "mopmove") { if (e.from === key) mop = false; if (e.to === key) mop = true; }
   if (has("mop")) mop = true;
   if (has("nomop")) mop = false;
-  return { active, mop: active && mop, duty: active && !has("noduty"), off, events: evs };
+  return { active, mop: active && mop, duty: active && !has("noduty"), off, events: evs, afterYeshiva };
 }
 
 export function tasksForDay(key, duty, room, settings, events) {
@@ -360,7 +365,7 @@ export function mergeEvents(shared, roomDoc, roomId) {
   const ignored = new Set(r.ignoredEvents || []);
   return [...(shared || []).filter(e => !ignored.has(e.id)).map(e => ({ ...e, room: null })), ...own];
 }
-export const SETTING_KEYS = ["activeDays", "mopDay", "outside"];
+export const SETTING_KEYS = ["activeDays", "mopDay", "outside", "sundayYeshiva"];
 export function roomSettings(shared, roomDoc) {
   const base = mergeSettings(shared);
   if (!roomDoc || !roomDoc.independent) return base;

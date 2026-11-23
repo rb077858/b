@@ -5,8 +5,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, ADMIN_EMAIL, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, GOOGLE_SVG
-} from "../common.js?v=11";
-import * as C from "../core.js?v=11";
+} from "../common.js?v=12";
+import * as C from "../core.js?v=12";
 
 const { doc, collection, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } = FS;
 
@@ -197,6 +197,7 @@ function vSettings() {
   return `<div class="card"><h2>לו"ז קבוע (משותף לכל החדרים)</h2><p class="muted small" style="margin:0">חל על כל החדרים שמחוברים למאגר המשותף. חדרים במצב עצמאי קובעים לעצמם.</p>
     <div class="field" style="margin-top:12px"><span>ימים עם ניקיון בוקר</span><div class="seg">${C.DAY_NAMES.map((n, i) => `<button data-act="day" data-v="${i}" class="${s.activeDays.includes(i) ? "on" : ""}">${n}</button>`).join("")}</div></div>
     <div class="field"><span>יום שטיפת החדר</span><div class="seg">${C.DAY_NAMES.map((n, i) => `<button data-act="mop" data-v="${i}" class="${s.mopDay === i ? "on" : ""}">${n}</button>`).join("")}<button data-act="mop" data-v="-1" class="${s.mopDay < 0 ? "on" : ""}">אין</button></div></div>
+    <label class="switch"><div class="tx"><b>יום ראשון רק אחרי שבת ישיבה</b><span>בדרך כלל אין משימות ביום ראשון. כשמסמנים "שבת ישיבה" בלו"ז - ביום ראשון שאחריה יש</span></div><input type="checkbox" data-set="sundayYeshiva" ${s.sundayYeshiva ? "checked" : ""}></label>
     <label class="switch"><div class="tx"><b>"מחוץ לפנימייה" כחלק מתורנות המטבחון</b><span>מוסיף משימת ניקיון בחוץ לחדר התורן</span></div><input type="checkbox" data-set="outside" ${s.outside ? "checked" : ""}></label>
     <label class="field" style="margin-top:10px"><span>להזכיר לעדכן תורנות אחרי (ימים)</span><input class="inp" type="number" min="1" max="14" data-set="staleDays" value="${s.staleDays}" style="max-width:120px"></label>
   </div>
@@ -204,7 +205,7 @@ function vSettings() {
 }
 async function saveSettings(patch) {
   const next = { ...C.mergeSettings(S.settingsRaw), ...patch };
-  await setDoc(doc(db, "sites", "cheder"), { activeDays: next.activeDays, mopDay: next.mopDay, outside: next.outside, staleDays: next.staleDays, updatedAt: serverTimestamp() });
+  await setDoc(doc(db, "sites", "cheder"), { activeDays: next.activeDays, mopDay: next.mopDay, outside: next.outside, staleDays: next.staleDays, sundayYeshiva: next.sundayYeshiva, updatedAt: serverTimestamp() });
   toast("נשמר ✓", 1200);
 }
 

@@ -134,6 +134,7 @@ const ev = (o = {}) => ({ type: 'off', from: '2026-11-18', to: '2026-11-18', tit
 await ok('manager adds shared event', addDoc(collection(A, 'ch_events'), ev()));
 await no('resident adds shared event', addDoc(collection(R, 'ch_events'), ev({ by: 'r@x.com' })));
 await no('bad type', addDoc(collection(A, 'ch_events'), ev({ type: 'hack' })));
+await ok('yeshiva shabbat event', addDoc(collection(A, 'ch_events'), ev({ type: 'yeshiva', from: '2026-11-21', to: '2026-11-21' })));
 await no('delete other room event', deleteDoc(doc(A, 'ch_events/e42')));
 await ok('admin deletes any event', deleteDoc(doc(ADM, 'ch_events/e42')));
 
