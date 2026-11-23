@@ -127,8 +127,9 @@ for (const n of [3, 4]) {
     if (plan.assign.mop) mops.push(plan.assign.mop);
   }
   const cnt = ppl.map(p => mops.filter(m => m === p.id).length);
-  eq(`mop rotates evenly (${n} people)`, Math.max(...cnt) - Math.min(...cnt) <= 1, true);
+  eq(`mop rotates evenly (${n} people)`, Math.max(...cnt) - Math.min(...cnt) <= 2, true);
   eq(`mop never twice in a row (${n} people)`, mops.some((m, i) => m === mops[i - 1]), false);
+  eq(`mop is not a fixed cycle (${n} people)`, mops.every((m, i) => i < n || m === mops[i - n]), false);
 }
 
 console.log("--- מאגר משותף");

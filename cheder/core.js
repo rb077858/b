@@ -268,6 +268,8 @@ export function computeStats(history, ids) {
   return st;
 }
 
+// כוונון: today = כמה חשוב איזון בתוך אותו יום, turn/again = תור לכל משימה, noise = כמה אקראיות
+export const TUNE = { today: 70, turn: 40, again: 250, noise: 90 };
 export function assignTasks({ tasks, present, history = [], key, keep = {} }) {
   const assign = {};
   if (!present.length) return assign;
@@ -294,13 +296,14 @@ export function assignTasks({ tasks, present, history = [], key, keep = {} }) {
       const s = st[id];
       // "חוב": כמה פחות ממה שמצופה (לפי הימים שהיה) הוא עשה בפועל. מוגבל, כדי שלא יקבל הכל ביום אחד
       const owed = s.days > 0 ? Math.max(-2, Math.min(2, avg * s.days - s.load)) : 0;
-      const score = (today[id] - owed * 0.5) * 100
+      const score = (today[id] - owed * 0.5) * TUNE.today
         + rate(id) * 10
         // תור: מי שעשה את המשימה הזו פחות פעמים מהאחרים - קודם; מי שעשה אותה בפעם הקודמת שהייתה - לא שוב
-        + (did(id, t) - minDid) * 45
-        + (lastOcc[t] && s.last[t] === lastOcc[t] ? 70 : 0)
+        + (did(id, t) - minDid) * TUNE.turn
+        + (lastOcc[t] && s.last[t] === lastOcc[t] ? TUNE.again : 0)
         - (s.last[t] ? Math.min(daysBetween(s.last[t], key), 60) : 60) / 10
-        + (hash(`${key}|${t}|${id}`) % 1000) / 1000;
+        // אקראיות קבועה לכל יום (כל המכשירים מחשבים אותו דבר), כדי שהחלוקה לא תהיה צפויה
+        + (hash(`${key}|${t}|${id}`) % 1000) / 1000 * TUNE.noise;
       if (score < bestScore) { bestScore = score; best = id; }
     }
     assign[t] = best;
