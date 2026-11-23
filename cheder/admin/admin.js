@@ -5,8 +5,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, ADMIN_EMAIL, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, GOOGLE_SVG
-} from "../common.js?v=10";
-import * as C from "../core.js?v=10";
+} from "../common.js?v=11";
+import * as C from "../core.js?v=11";
 
 const { doc, collection, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, serverTimestamp } = FS;
 

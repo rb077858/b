@@ -8,8 +8,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, colorOf, initials, GOOGLE_SVG
-} from "./common.js?v=10";
-import * as C from "./core.js?v=10";
+} from "./common.js?v=11";
+import * as C from "./core.js?v=11";
 
 const { doc, collection, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, runTransaction, writeBatch, serverTimestamp, deleteField, arrayUnion, arrayRemove } = FS;
 
