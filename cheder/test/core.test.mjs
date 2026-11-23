@@ -43,7 +43,7 @@ eq("empty", C.parseDutyText("בוקר טוב לכולם", "2026-11-17"), []);
 console.log("--- ימים ומשימות");
 const duty = { date: "2026-11-16", floor: ["37", "41", "45"], kitchen: ["39"] };
 eq("dutyFor", C.dutyFor([{ date: "2026-11-10" }, duty, { date: "2026-11-20" }], "2026-11-17").date, "2026-11-16");
-eq("sunday room 41", C.tasksForDay("2026-11-15", duty, "41"), ["table", "sweep", "trash", "hall", "restroom", "sinks", "toilets", "bins"]);
+eq("sunday room 41 (yeshiva off)", C.tasksForDay("2026-11-15", duty, "41", { sundayYeshiva: false }), ["table", "sweep", "trash", "hall", "restroom", "sinks", "toilets", "bins"]);
 eq("thursday mop", C.tasksForDay("2026-11-19", null, "41"), ["table", "sweep", "trash", "mop"]);
 eq("kitchen room", C.tasksForDay("2026-11-17", duty, "39"), ["table", "sweep", "trash", "kitchen", "club", "outside"]);
 eq("shabbat none", C.tasksForDay("2026-11-21", duty, "41"), []);
@@ -56,9 +56,17 @@ const ev = [
 eq("trip off", C.tasksForDay("2026-11-18", duty, "41", null, ev), []);
 eq("mop moved away", C.tasksForDay("2026-11-19", null, "41", null, ev), ["table", "sweep", "trash"]);
 eq("mop moved to friday", C.tasksForDay("2026-11-20", null, "41", null, ev), ["table", "sweep", "trash", "mop"]);
-eq("noduty only room 41", C.tasksForDay("2026-11-22", duty, "41", null, ev), ["table", "sweep", "trash"]);
-eq("noduty not for 37", C.tasksForDay("2026-11-22", duty, "37", null, ev).length, 8);
+eq("noduty only room 41", C.tasksForDay("2026-11-22", duty, "41", { sundayYeshiva: false }, ev), ["table", "sweep", "trash"]);
+eq("noduty not for 37", C.tasksForDay("2026-11-22", duty, "37", { sundayYeshiva: false }, ev).length, 8);
 eq("shabbat forced on", C.tasksForDay("2026-11-28", null, "41", null, ev), ["table", "sweep", "trash"]);
+
+eq("sunday: no tasks by default", C.tasksForDay("2026-11-22", duty, "41"), []);
+const yev = [{ type: "yeshiva", from: "2026-11-21", to: "2026-11-21" }];
+eq("sunday after yeshiva shabbat", C.tasksForDay("2026-11-22", null, "41", null, yev), ["table", "sweep", "trash"]);
+eq("yeshiva shabbat itself has no tasks", C.tasksForDay("2026-11-21", null, "41", null, yev), []);
+eq("only the next sunday", C.tasksForDay("2026-11-29", null, "41", null, yev), []);
+eq("room-only yeshiva", [C.tasksForDay("2026-11-22", null, "41", null, [{ ...yev[0], room: "41" }]).length, C.tasksForDay("2026-11-22", null, "37", null, [{ ...yev[0], room: "41" }]).length], [3, 0]);
+eq("'on' still forces sunday", C.tasksForDay("2026-11-22", null, "41", null, [{ type: "on", from: "2026-11-22" }]).length, 3);
 
 console.log("--- חלוקה");
 const residents = [{ id: "a", name: "אבי" }, { id: "b", name: "בני" }, { id: "c", name: "גדי" }, { id: "d", name: "דני", left: "2026-11-01" }];
@@ -93,7 +101,7 @@ eq("unchanged -> changed:false", C.buildPlan({ ...args, existing: base }).change
 const noDuty = C.buildPlan({ ...args, duty: null }).plan;
 const withDuty = C.buildPlan({ ...args, existing: noDuty }).plan;
 eq("late duty keeps room tasks", ["table", "sweep"].every(t => withDuty.assign[t] === noDuty.assign[t]), true);
-eq("week projection", C.projectPlans({ fromKey: "2026-11-15", days: 7, room: "41", residents, absences, duties: [duty], history: hist, events: ev }).map(p => p.tasks.length), [3, 8, 0, 0, 8, 9, 0]);
+eq("week projection", C.projectPlans({ fromKey: "2026-11-15", days: 7, room: "41", residents, absences, duties: [duty], history: hist, events: ev }).map(p => p.tasks.length), [0, 8, 0, 0, 8, 9, 0]);
 eq("nobody present", C.buildPlan({ ...args, absences: ["a", "b", "c"].map(rid => ({ rid, from: "2026-11-01" })) }).plan.assign, {});
 
 const solo = C.buildPlan({ ...args, residents: [residents[0]] }).plan;

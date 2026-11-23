@@ -8,8 +8,8 @@
 import {
   db, FS, $, esc, emailKey, isAdminUser, authError, signIn, watchAuth, logout,
   toggleTheme, toast, sheet, confirmSheet, colorOf, initials, GOOGLE_SVG
-} from "./common.js?v=11";
-import * as C from "./core.js?v=11";
+} from "./common.js?v=12";
+import * as C from "./core.js?v=12";
 
 const { doc, collection, getDoc, setDoc, updateDoc, addDoc, deleteDoc, onSnapshot, query, where, orderBy, limit, runTransaction, writeBatch, serverTimestamp, deleteField, arrayUnion, arrayRemove } = FS;
 
@@ -278,7 +278,8 @@ const roleChips = key => {
   if (info.active && info.duty && roles.floor) ch.push(`<span class="chip floor"> תורנות קומה</span>`);
   if (info.active && info.duty && roles.kitchen) ch.push(`<span class="chip kitchen"> מטבחון ומועדון</span>`);
   if (info.mop) ch.push(`<span class="chip mop"> יום שטיפה</span>`);
-  for (const e of info.events) if (e.type === "note" || (e.type !== "off" && e.title)) ch.push(`<span class="chip">${C.EVENT_TYPES[e.type].icon} ${esc(e.title || C.EVENT_TYPES[e.type].short)}</span>`);
+  if (info.active && info.afterYeshiva) ch.push(`<span class="chip">אחרי שבת ישיבה</span>`);
+  for (const e of info.events) if (e.type === "note" || e.type === "yeshiva" || (e.type !== "off" && e.title)) ch.push(`<span class="chip">${C.EVENT_TYPES[e.type].icon} ${esc(e.title || C.EVENT_TYPES[e.type].short)}</span>`);
   return ch.join("");
 };
 const absText = ab => `${C.reasonOf(ab).icon} ${C.reasonOf(ab).name}${ab.to ? ` עד ${C.fmtDate(ab.to)}` : " · עד הודעה חדשה"}${ab.note ? " · " + esc(ab.note) : ""}`;
@@ -488,7 +489,7 @@ function vRoom() {
     ${mgr ? `<label class="switch"><div class="tx"><b>מחוברים למאגר המשותף</b><span>תורנויות וחופשות שחדרים אחרים מזינים מתעדכנים גם אצלכם (אפשר תמיד להזין אחרת רק לחדר)</span></div><input type="checkbox" data-room="shared" ${independent() ? "" : "checked"}></label>`
       : `<div class="status ${independent() ? "warn" : "on"}" style="margin:0">${independent() ? " החדר במצב עצמאי" : " החדר מחובר למאגר המשותף"}</div>`}
     ${independent() && mgr ? ownSettingsHtml() : ""}
-    ${!independent() ? `<div class="small muted" style="margin-top:8px">ימי ניקיון: ${S.settings.activeDays.map(i => C.DAY_NAMES[i]).join(", ")} · שטיפה: ${S.settings.mopDay >= 0 ? "יום " + C.DAY_NAMES[S.settings.mopDay] : "אין"}. רק המנהל משנה - אפשר להציע לו שינוי בלשונית "עוד".</div>` : ""}
+    ${!independent() ? `<div class="small muted" style="margin-top:8px">ימי ניקיון: ${S.settings.activeDays.filter(i => !(i === 0 && S.settings.sundayYeshiva)).map(i => C.DAY_NAMES[i]).join(", ")}${S.settings.sundayYeshiva ? " (ראשון - רק אחרי שבת ישיבה)" : ""} · שטיפה: ${S.settings.mopDay >= 0 ? "יום " + C.DAY_NAMES[S.settings.mopDay] : "אין"}. רק המנהל משנה - אפשר להציע לו שינוי בלשונית "עוד".</div>` : ""}
   </div>`;
 
   // הוגנות
@@ -506,6 +507,7 @@ function ownSettingsHtml() {
   return `<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
     <div class="field"><span>ימים עם ניקיון בוקר (רק אצלכם)</span><div class="seg">${C.DAY_NAMES.map((n, i) => `<button data-act="own" data-k="day" data-v="${i}" class="${s.activeDays.includes(i) ? "on" : ""}">${n}</button>`).join("")}</div></div>
     <div class="field"><span>יום שטיפת החדר</span><div class="seg">${C.DAY_NAMES.map((n, i) => `<button data-act="own" data-k="mop" data-v="${i}" class="${s.mopDay === i ? "on" : ""}">${n}</button>`).join("")}<button data-act="own" data-k="mop" data-v="-1" class="${s.mopDay < 0 ? "on" : ""}">אין</button></div></div>
+    <label class="switch"><div class="tx"><b>יום ראשון רק אחרי שבת ישיבה</b></div><input type="checkbox" data-room="sundayYeshiva" ${s.sundayYeshiva ? "checked" : ""}></label>
     <label class="switch"><div class="tx"><b>"מחוץ לפנימייה" בתורנות המטבחון</b></div><input type="checkbox" data-room="outside" ${s.outside ? "checked" : ""}></label>
   </div>`;
 }
@@ -599,7 +601,7 @@ $("view").addEventListener("change", async e => {
       if (ind && !(S.roomDoc && S.roomDoc.ownSettings)) patch.ownSettings = Object.fromEntries(C.SETTING_KEYS.map(x => [x, S.settings[x]]));
       await updateDoc(roomRef(), patch);
       toast(ind ? "החדר במצב עצמאי " : "חזרתם למאגר המשותף ");
-    } else if (k === "outside") await updateDoc(roomRef(), { "ownSettings.outside": e.target.checked });
+    } else if (k === "outside" || k === "sundayYeshiva") await updateDoc(roomRef(), { [`ownSettings.${k}`]: e.target.checked });
   } catch (err) { fail(err); }
 });
 async function ownSetting(k, v) {
@@ -871,6 +873,7 @@ function eventSheet() {
     if (act === "type") {
       st.type = el.dataset.v;
       if (st.type === "mopmove" && S.settings.mopDay >= 0) { st.from = nextWeekday(S.settings.mopDay); st.to = C.addDays(st.from, 1); }
+      if (st.type === "yeshiva") { st.from = nextWeekday(6); st.to = st.from; st.title = st.title || "שבת ישיבה"; }
       draw(root); return;
     }
     if (act === "scope") { st.scope = el.dataset.v; draw(root); return; }
@@ -879,6 +882,8 @@ function eventSheet() {
     if (!C.isDateKey(st.from) || !C.isDateKey(st.to)) return toast("בחרו תאריכים");
     if (st.type !== "mopmove" && st.to < st.from) return toast("תאריך הסיום לפני ההתחלה");
     if (st.type === "mopmove" && st.to === st.from) return toast("בחרו יום אחר");
+    if (st.type === "yeshiva" && C.weekday(st.from) !== 6) return toast("בחרו את יום השבת");
+    if (st.type === "yeshiva") st.to = st.from;
     const ev = { type: st.type, from: st.from, to: st.to, title: st.title.trim().slice(0, 60), by: myEmail(), byRoom: S.room, at: Date.now() };
     close();
     try {
@@ -1007,7 +1012,7 @@ function helpSheet() {
       <div class="li"><span class="emo"></span><div class="tx"><b>תורנות קומה ומטבחון</b><span>מדביקים את ההודעה של המדריך בלשונית "תורנות". מספיק שחדר אחד ידביק, וזה מתעדכן לכולם. אפשר גם להזין אחרת רק לחדר.</span></div></div>
       <div class="li"><span class="emo"></span><div class="tx"><b>מישהו חולה / נסע הביתה</b><span>⋯ ליד השם. המשימות שלו עוברות לאחרים, ומה שכבר בוצע נשאר.</span></div></div>
       <div class="li"><span class="emo">⇄</span><div class="tx"><b>החלפות</b><span>האחראי מעביר משימה (⇄) או מחליף בין שניים את כל המשימות (⋯ ← החלפת תורנות).</span></div></div>
-      <div class="li"><span class="emo"></span><div class="tx"><b>חופשות, טיולים ושינויים</b><span>בלשונית "השבוע". משותף לכל הפנימייה או רק לחדר, ואפשר לסמן שינוי משותף "לא חל עלינו".</span></div></div>
+      <div class="li"><span class="emo"></span><div class="tx"><b>חופשות, טיולים ושינויים</b><span>בלשונית "השבוע". ביום ראשון אין משימות, אלא אם מסמנים "שבת ישיבה" על השבת שלפניו. משותף לכל הפנימייה או רק לחדר, ואפשר לסמן שינוי משותף "לא חל עלינו".</span></div></div>
       <div class="li"><span class="emo"></span><div class="tx"><b>מצב עצמאי</b><span>בלשונית "החדר" אפשר לצאת מהמאגר המשותף ולנהל הכל לבד, כולל ימי ניקיון ויום שטיפה.</span></div></div>
       <div class="li"><span class="emo"></span><div class="tx"><b>הוגנות</b><span>מי שעשה פחות לאורך זמן מקבל קודם. נספר רק מה שסומן ✓ - לכן חשוב לסמן! שטיפה ושירותים נחשבים יותר משולחן.</span></div></div>
     </div><div class="btns"><button class="btn block" data-act="close">סגירה</button></div>`);
