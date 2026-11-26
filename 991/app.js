@@ -573,11 +573,45 @@ $$('#tabs button').forEach(b => b.onclick = () => {
   if (b.dataset.tab === 'games' && S.tab === 'games' && S.game && (!isMobile() || S.sheet)) GAMES_UI.close(true);
   go(b.dataset.tab); openSheet(); renderPeek();
 });
-$('#peek').addEventListener('click', e => { if (e.target.closest('button')) return; S.sheet ? closeSheet() : openSheet(); renderPeek(); });
+$('#peek').addEventListener('click', e => { if (e.target.closest('button') || justDragged) return; S.sheet ? closeSheet() : openSheet(); renderPeek(); });
 $('#scrim').onclick = () => { closeSheet(); renderPeek(); };
-let ty = null;
-$('#peek').addEventListener('touchstart', e => { ty = e.touches[0].clientY; }, { passive: true });
-$('#peek').addEventListener('touchend', e => { if (ty == null) return; const dy = e.changedTouches[0].clientY - ty; ty = null; if (dy < -30) openSheet(); else if (dy > 30) closeSheet(); renderPeek(); });
+/* finger-following drag for the bottom sheet */
+let drag = null, justDragged = false;
+const panelEl = $('.panel'), scrimEl = $('#scrim'), bodyEl = $('#panel');
+const closedOff = () => panelEl.offsetHeight - $('#peek').offsetHeight;
+function dragStart(y, fromBody) { if (!isMobile()) return; drag = { y0: y, base: S.sheet ? 0 : closedOff(), R: closedOff(), off: null, moved: false, fromBody, hist: [[y, performance.now()]] }; }
+function dragMove(y, e) {
+  if (!drag) return;
+  const dy = y - drag.y0;
+  if (!drag.moved) {
+    if (Math.abs(dy) < 6) return;
+    if (drag.fromBody && (dy < 0 || bodyEl.scrollTop > 0)) { drag = null; return; } // let the content scroll
+    drag.moved = true; panelEl.style.transition = 'none'; scrimEl.style.transition = 'none'; document.body.classList.add('sheet-open');
+  }
+  if (e.cancelable) e.preventDefault();
+  let off = drag.base + dy;
+  if (off < 0) off = off / 4; // soft rubber-band past fully open
+  off = Math.min(off, drag.R);
+  drag.off = off; panelEl.style.transform = `translateY(${off}px)`;
+  scrimEl.style.opacity = String(Math.max(0, Math.min(1, 1 - off / drag.R)));
+  drag.hist.push([y, performance.now()]); if (drag.hist.length > 5) drag.hist.shift();
+}
+function dragEnd() {
+  if (!drag) return; const d = drag; drag = null;
+  if (!d.moved) return;
+  const [y1, t1] = d.hist[0], [y2, t2] = d.hist[d.hist.length - 1];
+  const v = (y2 - y1) / Math.max(1, t2 - t1); // px per ms, + = downward
+  const projected = d.off + v * 220;
+  panelEl.style.transition = ''; scrimEl.style.transition = '';
+  panelEl.style.transform = ''; scrimEl.style.opacity = '';
+  if (Math.abs(v) > 0.5 ? v < 0 : projected < d.R / 2) openSheet(); else closeSheet();
+  justDragged = true; setTimeout(() => { justDragged = false; }, 80);
+  renderPeek();
+}
+$('#peek').addEventListener('touchstart', e => dragStart(e.touches[0].clientY, false), { passive: true });
+bodyEl.addEventListener('touchstart', e => { if (S.sheet && bodyEl.scrollTop <= 0) dragStart(e.touches[0].clientY, true); }, { passive: true });
+document.addEventListener('touchmove', e => { if (drag) dragMove(e.touches[0].clientY, e); }, { passive: false });
+document.addEventListener('touchend', dragEnd); document.addEventListener('touchcancel', dragEnd);
 mq.addEventListener('change', placeNav); addEventListener('resize', fitMobile);
 placeNav();
 $('#btn-flip').onclick = () => setFlip(!S.flip);
