@@ -297,6 +297,9 @@ export function assignTasks({ tasks, present, history = [], key, keep = {} }) {
   for (const t of todo) {
     let best = null, bestScore = Infinity;
     const minDid = Math.min(...present.map(id => did(id, t)));
+    // מי ששוטף את החדר לא מקבל עוד משימות - אלא אם אין ברירה (כל השאר כבר עמוסים כמוהו)
+    const washer = t !== "mop" ? assign.mop : null;
+    const spareWasher = washer && present.some(o => o !== washer && today[o] + W(t) <= today[washer]);
     for (const id of present) {
       const s = st[id];
       // "חוב": כמה פחות ממה שמצופה (לפי הימים שהיה) הוא עשה בפועל. מוגבל, כדי שלא יקבל הכל ביום אחד
@@ -308,7 +311,8 @@ export function assignTasks({ tasks, present, history = [], key, keep = {} }) {
         + (lastOcc[t] && s.last[t] === lastOcc[t] ? TUNE.again : 0)
         - (s.last[t] ? Math.min(daysBetween(s.last[t], key), 60) : 60) / 10
         // אקראיות קבועה לכל יום (כל המכשירים מחשבים אותו דבר), כדי שהחלוקה לא תהיה צפויה
-        + (hash(`${key}|${t}|${id}`) % 1000) / 1000 * TUNE.noise;
+        + (hash(`${key}|${t}|${id}`) % 1000) / 1000 * TUNE.noise
+        + (spareWasher && id === washer ? 1e6 : 0);
       if (score < bestScore) { bestScore = score; best = id; }
     }
     assign[t] = best;

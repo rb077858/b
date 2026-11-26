@@ -140,6 +140,22 @@ for (const n of [3, 4]) {
   eq(`mop is not a fixed cycle (${n} people)`, mops.every((m, i) => i < n || m === mops[i - n]), false);
 }
 
+// מי ששוטף לא מקבל עוד משימות בחמישי רגיל
+{
+  const ppl = ["a", "b", "c"].map(id => ({ id, name: id }));
+  let hw = []; let extra = 0, thu = 0;
+  for (let i = 0; i < 7 * 12; i++) {
+    const key = C.addDays("2026-09-06", i);
+    const { plan } = C.buildPlan({ key, room: "41", residents: ppl, absences: [], duty: null, history: hw.slice(-60), existing: null });
+    if (plan.assign.mop) { thu++; if (C.tasksOf(plan, plan.assign.mop).length > 1) extra++; }
+    hw.push({ ...plan, done: Object.fromEntries(plan.tasks.map(t => [t, true])) });
+  }
+  eq("washer gets nothing else on a regular Thursday", [thu, extra], [12, 0]);
+  const L = C.computeStats(hw.slice(-60), ["a", "b", "c"]);
+  const loads = ["a", "b", "c"].map(x => L[x].load);
+  eq("still balanced", (Math.max(...loads) - Math.min(...loads)) / Math.max(...loads) <= 0.1, true);
+}
+
 console.log("--- מאגר משותף");
 const sh = [{ date: "2026-11-16", floor: ["37"], kitchen: ["39"] }, { date: "2026-11-19", floor: ["50"], kitchen: [] }];
 const lo = [{ date: "2026-11-17", floor: ["41"], kitchen: [] }];
