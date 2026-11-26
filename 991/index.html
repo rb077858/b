@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>fx-991ES PLUS – המדריך האינטראקטיבי</title>
+<meta name="description" content="סימולטור ומדריך אינטראקטיבי למחשבון Casio fx-991ES PLUS: כל מקש, כל מצב, כל הגדרה – צעד אחר צעד.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="bg-glow"></div>
+<header class="hero">
+  <div class="hero-text">
+    <div class="eyebrow">Casio · fx-991ES PLUS · 2nd edition</div>
+    <h1>המחשבון שלך, <span class="grad">מוסבר עד המקש האחרון</span></h1>
+    <p>לחצו על כל מקש במחשבון – הוא באמת מחשב, ובצד מופיע הסבר מלא: הפונקציה הרגילה, ה-<b class="c-shift">SHIFT</b> וה-<b class="c-alpha">ALPHA</b>, כל 8 המצבים, כל ההגדרות, ומדריכים צעד-אחר-צעד.</p>
+  </div>
+  <div class="search">
+    <input id="search" type="search" placeholder="חיפוש: סטיית תקן, נגזרת, nCr, רדיאנים…" autocomplete="off">
+    <div id="search-res" class="search-res" hidden></div>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="calc-col">
+    <div id="calc" class="calc" aria-label="מחשבון Casio fx-991ES PLUS"></div>
+    <div class="quick" id="quick" hidden></div>
+    <div class="status" id="status"></div>
+    <div class="calc-tools">
+      <button id="btn-sound" class="tool" title="צליל לחיצה">🔊</button>
+      <button id="btn-reset" class="tool" title="איפוס הסימולטור">⟲ איפוס</button>
+      <span class="kbd-hint">אפשר גם מהמקלדת: ספרות, + − * / ^ ( ) Enter Backspace Esc</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <nav class="tabs" id="tabs">
+      <button data-tab="keys" class="on"><span>⌨</span>מקשים</button>
+      <button data-tab="modes"><span>◧</span>מצבים</button>
+      <button data-tab="setup"><span>⚙</span>הגדרות</button>
+      <button data-tab="tuts"><span>▶</span>מדריכים</button>
+      <button data-tab="consts"><span>ℏ</span>קבועים והמרות</button>
+      <button data-tab="quiz"><span>★</span>אתגר</button>
+    </nav>
+    <div id="panel" class="panel-body"></div>
+  </section>
+</main>
+
+<footer class="foot">נבנה ללמידה · הסימולטור מחקה את התנהגות המחשבון האמיתי ככל האפשר – במקרה של ספק, המחשבון שבידכם קובע 🙂</footer>
+<div id="toast" class="toast"></div>
+<div id="tip" class="tip" hidden></div>
+
+<script src="data.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
