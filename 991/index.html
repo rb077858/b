@@ -31,6 +31,7 @@
     <div class="calc-tools">
       <button id="btn-sound" class="tool" title="צליל לחיצה">🔊</button>
       <button id="btn-reset" class="tool" title="איפוס הסימולטור">⟲ איפוס</button>
+      <button id="btn-flip" class="tool" title="הפוך את המסך">🙃 הפוך מסך</button>
       <span class="kbd-hint">אפשר גם מהמקלדת: ספרות, + − * / ^ ( ) Enter Backspace Esc</span>
     </div>
   </section>
@@ -41,9 +42,11 @@
       <button data-tab="modes"><span>◧</span>מצבים</button>
       <button data-tab="setup"><span>⚙</span>הגדרות</button>
       <button data-tab="tuts"><span>▶</span>מדריכים</button>
-      <button data-tab="consts"><span>ℏ</span>קבועים והמרות</button>
+      <button data-tab="games"><span>🎮</span>משחקים</button>
+      <button data-tab="consts"><span>ℏ</span><em class="lg-only">קבועים והמרות</em><em class="sm-only">קבועים</em></button>
       <button data-tab="quiz"><span>★</span>אתגר</button>
     </nav>
+    <div class="peek" id="peek"><div class="handle"></div><div id="peek-c" class="peek-c"></div></div>
     <div id="panel" class="panel-body"></div>
   </section>
 </main>
@@ -51,9 +54,11 @@
 <footer class="foot">נבנה ללמידה · הסימולטור מחקה את התנהגות המחשבון האמיתי ככל האפשר – במקרה של ספק, המחשבון שבידכם קובע 🙂</footer>
 <div id="toast" class="toast"></div>
 <div id="tip" class="tip" hidden></div>
+<div id="scrim" class="scrim"></div>
 
 <script src="data.js"></script>
 <script src="engine.js"></script>
+<script src="games.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

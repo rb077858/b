@@ -7,7 +7,7 @@ const strip = h => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(
 const store = { get(k, d) { try { const v = localStorage.getItem('fx991.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('fx991.' + k, JSON.stringify(v)); } catch (e) {} } };
 
 const calc = new Calc();
-const S = { tab: 'keys', key: null, layer: 'm', mode: null, setupHL: null, tut: null, quiz: null, running: false, csub: 'const', convVal: '10', cfilter: '', tcat: 'הכל', hl: null };
+const S = { game: null, flip: false, sheet: false, tab: 'keys', key: null, layer: 'm', mode: null, setupHL: null, tut: null, quiz: null, running: false, csub: 'const', convVal: '10', cfilter: '', tcat: 'הכל', hl: null };
 const LAYER = { m: { name: 'לחיצה רגילה', c: '#e8ebf2', how: '' }, s: { name: 'SHIFT', c: 'var(--shift)', how: 'SHIFT ואז המקש' }, a: { name: 'ALPHA', c: 'var(--alpha)', how: 'ALPHA ואז המקש' } };
 const seqIds = s => s.trim().split(/\s+/).filter(Boolean).map(x => x === '.' ? 'dot' : x);
 
@@ -87,7 +87,7 @@ function indHTML(ind) {
 function renderLCD(s) {
   const lcd = $('#lcd');
   if (s.type === 'off') { lcd.className = 'lcd off'; lcd.innerHTML = indHTML([]) + '<div class="lcd-body"></div>'; return; }
-  lcd.className = 'lcd' + (s.err ? ' err' : '');
+  lcd.className = 'lcd' + (s.err ? ' err' : '') + (S.flip ? ' flip' : '');
   const c = s.contrast == null ? 5 : s.contrast;
   lcd.style.filter = c === 5 ? '' : `contrast(${0.5 + c * 0.1}) brightness(${1.15 - c * 0.03})`;
   let b = '';
@@ -122,7 +122,7 @@ function renderCalcState() {
   el.classList.toggle('shift-on', q ? q === 's' : calc.shift);
   el.classList.toggle('alpha-on', q ? q === 'a' : calc.alpha);
   el.classList.toggle('base-on', calc.mode === 'BASE-N');
-  renderStatus();
+  renderStatus(); renderPeek();
 }
 function renderStatus() {
   const s = calc.setup;
@@ -145,9 +145,11 @@ function userPress(id) {
   if (S.running) return;
   if (S.quiz && S.quiz.active) { pressAnim(id); return quizPress(id); }
   if (S.tut) { return tutPress(id); }
+  if (S.game && GAMES_UI.onKey(id, S.game)) { pressAnim(id); return; }
   pressAnim(id);
   const evs = calc.press(id);
   renderCalcState();
+  if (S.game) { handleEvents(evs, false); GAMES_UI.after(evs, S.game); return; }
   handleEvents(evs);
 }
 function handleEvents(evs, follow = true) {
@@ -186,7 +188,7 @@ function handleEvents(evs, follow = true) {
 async function runSeq(seq, opts = {}) {
   if (S.running) return;
   if (S.tut) exitTut(false);
-  S.running = true;
+  S.running = true; closeSheet();
   const c = calc;
   c.menu = null; c.prompt = null; c.err = null; c.contrastScreen = false; c.shift = c.alpha = false; c.msg = null; c.on = true;
   if (opts.comp !== false && c.mode !== 'COMP') { c.setMode('COMP'); c.menu = null; }
@@ -207,15 +209,56 @@ async function runSeq(seq, opts = {}) {
 function go(tab) {
   if (tab !== 'tuts' && S.tut) exitTut(false);
   if (tab !== 'quiz' && S.quiz) { S.quiz.active = false; S.quiz = null; renderCalcState(); }
+  if (tab !== 'games' && S.game) GAMES_UI.close(true);
   S.tab = tab;
   $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
   const P = $('#panel'); P.style.animation = 'none'; void P.offsetWidth; P.style.animation = '';
-  ({ keys: renderKeys, modes: renderModes, setup: renderSetup, tuts: renderTuts, consts: renderConsts, quiz: renderQuiz })[tab]();
+  ({ keys: renderKeys, modes: renderModes, setup: renderSetup, tuts: renderTuts, consts: renderConsts, quiz: renderQuiz, games: GAMES_UI.render })[tab]();
+  $('#panel').scrollTop = 0; renderPeek();
   $$('#calc .kw.sel').forEach(k => k.classList.remove('sel'));
   if (tab === 'keys' && S.key) { const k = kwEl(S.key); if (k) k.classList.add('sel'); }
 }
 function showKey(id, layer = 'm') { S.key = id; S.layer = layer; go('keys'); const L = KEYS[id][layer]; quick(`${layer === 's' ? '<b class="c-shift">SHIFT</b> ' : layer === 'a' ? '<b class="c-alpha">ALPHA</b> ' : ''}<b>${L.n}</b> · ${L.t}`); }
-function quick(html) { const q = $('#quick'); q.innerHTML = `<span>${html}</span><button class="btn sm" onclick="document.querySelector('.panel').scrollIntoView({behavior:'smooth'})">להסבר ↓</button>`; q.hidden = false; }
+function quick(html) { S.quickHTML = html; const q = $('#quick'); q.innerHTML = `<span>${html}</span><button class="btn sm" onclick="document.querySelector('.panel').scrollIntoView({behavior:'smooth'})">להסבר ↓</button>`; q.hidden = false; renderPeek(); }
+
+/* =============== mobile: bottom sheet + bottom nav =============== */
+const mq = matchMedia('(max-width: 920px)');
+const isMobile = () => mq.matches;
+function openSheet() { if (!isMobile()) return; S.sheet = true; $('.panel').classList.add('open'); document.body.classList.add('sheet-open'); }
+function closeSheet() { S.sheet = false; $('.panel').classList.remove('open'); document.body.classList.remove('sheet-open'); }
+function renderPeek() {
+  const c = $('#peek-c'); if (!c) return;
+  let h;
+  if (S.tut) {
+    const T = S.tut, st = T.t.steps[T.i], done = T.pos >= T.seq.length, last = T.i === T.t.steps.length - 1;
+    h = `<div class="pk-tut"><div class="pk-top"><b class="pk-n">${T.i + 1}/${T.t.steps.length}</b><span class="pk-t">${st.t}</span></div>
+      <div class="pk-row"><div class="pk-seq">${T.seq.map((id, i) => chip(id, i < T.pos ? 'done' : i === T.pos ? 'cur' : '')).join('')}</div>
+      <button class="btn sm" data-pk="prev" ${T.i === 0 ? 'disabled' : ''}>→</button><button class="btn sm" data-pk="show" ${done ? 'disabled' : ''}>👁</button><button class="btn sm ${done ? 'pri' : ''}" data-pk="next">${done && last ? '🏁' : '←'}</button></div></div>`;
+  } else if (S.quiz && S.quiz.active) h = `<div class="pk-line">★ איפה נמצאת: <b>${S.quiz.q.n}</b> <span class="muted">(${S.quiz.n + 1}/${S.quiz.total} · ${S.quiz.score} נק׳)</span></div>`;
+  else if (S.game && GAMES_UI.peek(S.game)) h = `<div class="pk-line">${GAMES_UI.peek(S.game)}</div>`;
+  else h = `<div class="pk-line">${S.quickHTML || '👆 לחצו על מקש במחשבון – או משכו למעלה להסברים'}</div>`;
+  c.innerHTML = h + `<span class="pk-open">${S.sheet ? '▼' : '▲'}</span>`;
+  $$('[data-pk]', c).forEach(b => b.onclick = e => { e.stopPropagation(); const a = b.dataset.pk, T = S.tut;
+    if (a === 'prev') setStep(T.i - 1); else if (a === 'show') showMe();
+    else { if (T.pos < T.seq.length) T.pos = T.seq.length; if (T.i === T.t.steps.length - 1) finishTut(); else setStep(T.i + 1); } });
+  requestAnimationFrame(fitMobile);
+}
+function fitMobile() {
+  const root = document.documentElement;
+  if (!isMobile()) { root.style.removeProperty('--cw'); root.style.removeProperty('--peekh'); return; }
+  const pk = $('#peek'); const ph = pk.offsetHeight; root.style.setProperty('--peekh', ph + 'px');
+  const nav = $('#tabs').offsetHeight; const head = $('.hero').offsetHeight;
+  const el = $('#calc'); const ratio = el.offsetHeight / el.offsetWidth || 2.2;
+  const avail = innerHeight - head - nav - ph - 22;
+  const cw = Math.max(285, Math.min(innerWidth - 20, 440, avail / ratio));
+  root.style.setProperty('--cw', cw + 'px');
+}
+function placeNav() {
+  const nav = $('#tabs');
+  if (isMobile()) { if (nav.parentElement !== document.body) document.body.appendChild(nav); }
+  else { const p = $('.panel'); if (nav.parentElement !== p) p.prepend(nav); closeSheet(); }
+  fitMobile();
+}
 
 /* chip for a key id */
 function chip(id, extra = '') {
@@ -337,7 +380,7 @@ function openTut(id) {
   if (S.tab !== 'tuts') { S.tab = 'tuts'; $$('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === 'tuts')); }
   $$('#calc .kw.sel').forEach(k => k.classList.remove('sel'));
   renderPlayer(); renderCalcState(); placeBadges();
-  $('#panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (isMobile()) closeSheet(); else $('#panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 function exitTut(rerender = true) {
   S.tut = null; clearBadges(); renderCalcState(); if (rerender) renderTuts();
@@ -470,7 +513,7 @@ function renderQuiz() {
 function startQuiz() {
   const pool = quizPool().sort(() => Math.random() - 0.5);
   S.quiz = { active: true, qs: pool.slice(0, 10), n: 0, total: 10, score: 0, streak: 0, mod: 'm', fb: '', locked: false };
-  S.quiz.q = S.quiz.qs[0]; renderQuiz(); renderCalcState();
+  S.quiz.q = S.quiz.qs[0]; renderQuiz(); renderCalcState(); closeSheet();
 }
 function quizPress(id) {
   const Q = S.quiz; if (Q.locked) return;
@@ -511,7 +554,7 @@ function doSearch() {
   const res = IDX.map(x => { const tt = x.t.toLowerCase(), dd = x.d.toLowerCase(); let sc = 0; for (const w of words) { if (tt.includes(w)) sc += 3; else if (dd.includes(w)) sc += 1; else return null; } return [sc, x]; }).filter(Boolean).sort((a, b) => b[0] - a[0]).slice(0, 14);
   box.hidden = false;
   box.innerHTML = res.length ? res.map(([, x], i) => `<div class="sr" data-i="${i}"><span class="tag">${x.tag}</span><div><div class="t">${x.t}</div>${x.d ? `<div class="d">${x.d.slice(0, 90)}${x.d.length > 90 ? '…' : ''}</div>` : ''}</div></div>`).join('') : '<div class="sr"><div class="d">לא נמצא… נסו מילה אחרת</div></div>';
-  $$('.sr[data-i]', box).forEach(e => e.onclick = () => { res[+e.dataset.i][1].go(); box.hidden = true; $('#search').value = ''; $('.panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  $$('.sr[data-i]', box).forEach(e => e.onclick = () => { res[+e.dataset.i][1].go(); box.hidden = true; $('#search').value = ''; $('#search').blur(); if (isMobile()) openSheet(); else $('.panel').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 }
 
 /* =============== keyboard =============== */
@@ -524,7 +567,26 @@ document.addEventListener('keydown', e => {
 
 /* =============== init =============== */
 buildCalc();
-$$('#tabs button').forEach(b => b.onclick = () => { if (b.dataset.tab === 'keys' && S.tab === 'keys') S.key = null; if (b.dataset.tab === 'modes' && S.tab === 'modes') S.mode = null; go(b.dataset.tab); });
+$$('#tabs button').forEach(b => b.onclick = () => {
+  if (isMobile() && S.sheet && S.tab === b.dataset.tab) { closeSheet(); renderPeek(); return; }
+  if (!isMobile() || S.sheet) { if (b.dataset.tab === 'keys' && S.tab === 'keys') S.key = null; if (b.dataset.tab === 'modes' && S.tab === 'modes') S.mode = null; }
+  if (b.dataset.tab === 'games' && S.tab === 'games' && S.game && (!isMobile() || S.sheet)) GAMES_UI.close(true);
+  go(b.dataset.tab); openSheet(); renderPeek();
+});
+$('#peek').addEventListener('click', e => { if (e.target.closest('button')) return; S.sheet ? closeSheet() : openSheet(); renderPeek(); });
+$('#scrim').onclick = () => { closeSheet(); renderPeek(); };
+let ty = null;
+$('#peek').addEventListener('touchstart', e => { ty = e.touches[0].clientY; }, { passive: true });
+$('#peek').addEventListener('touchend', e => { if (ty == null) return; const dy = e.changedTouches[0].clientY - ty; ty = null; if (dy < -30) openSheet(); else if (dy > 30) closeSheet(); renderPeek(); });
+mq.addEventListener('change', placeNav); addEventListener('resize', fitMobile);
+placeNav();
+$('#btn-flip').onclick = () => setFlip(!S.flip);
+function setFlip(v) { S.flip = v; $('#lcd').classList.toggle('flip', v); $('#btn-flip').classList.toggle('on', v); }
+window.APP = { calc, runSeq, toast, chip, seqChips, sleep, kwEl, pressAnim, setFlip, closeSheet,
+  renderCalc: renderCalcState, panel: () => $('#panel'), game: () => S.game, busy: () => S.running,
+  setGame: g => { S.game = g; renderPeek(); }, rerenderGame: () => { if (S.tab === 'games') GAMES_UI.render(); renderPeek(); },
+  shake: id => { const k = kwEl(id); if (k) { k.classList.remove('shake'); void k.offsetWidth; k.classList.add('shake'); } },
+  decimal: () => { if (calc.result) { calc.result.view = 'dec'; renderCalcState(); } } };
 $('#search').addEventListener('input', doSearch);
 $('#search').addEventListener('keydown', e => { if (e.key === 'Enter') { const f = $('#search-res .sr[data-i]'); if (f) f.click(); } if (e.key === 'Escape') { $('#search-res').hidden = true; } });
 document.addEventListener('click', e => { if (!e.target.closest('.search')) $('#search-res').hidden = true; });
